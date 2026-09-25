@@ -788,7 +788,8 @@ body { background: #07111c; }
 .gaming-page { background: #07111c; }
 .navbar { background: rgba(5,14,25,.48); border-bottom-color: rgba(255,194,71,.22); }
 .navbar::after { background: #ffc247; box-shadow: 0 0 14px rgba(255,194,71,.55); }
-.brand-dot, .brand-mark i { color: #ffc247; background: #ffc247; }
+.brand-dot { color: #ffc247; background: none; }
+.brand-mark i { background: #ffc247; }
 .nav-link:hover, .nav-link.active { color: #ffc247; }
 .nav-link.active::after { background: #ffc247; box-shadow: 0 0 14px rgba(255,194,71,.65); }
 .live-dot { color: #ffc247; border-color: rgba(255,194,71,.5); }

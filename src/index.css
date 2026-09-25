@@ -1,9 +1,9 @@
 :root {
   --text: #aab8c4;
   --bg: #070b10;
-  --sans: 'Trebuchet MS', 'Segoe UI', sans-serif;
-  --heading: Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  --sans: 'Trebuchet MS', 'Segoe UI', 'Fira Sans', sans-serif;
+  --heading: Impact, Haettenschweiler, Anton, 'Arial Narrow Bold', sans-serif;
+  --mono: ui-monospace, Consolas, 'JetBrains Mono', monospace;
   --cyan: #67d6ff;
   --orange: #ffc247;
   --panel: #10151c;
