@@ -19,7 +19,7 @@ function AdminPanel({ onBack }) {
   const [matchLookup, setMatchLookup] = useState('')
   const [selectedMatch, setSelectedMatch] = useState(null)
   const [matchForm, setMatchForm] = useState({ entryFee: '', matchTimestamp: '', prizePool: '', description: '' })
-  const [createForm, setCreateForm] = useState({ mode: matchModes[0], entryFee: String(defaultFees[matchModes[0]]), matchTimestamp: '', prizePool: '', description: ''w })
+  const [createForm, setCreateForm] = useState({ mode: matchModes[0], entryFee: String(defaultFees[matchModes[0]]), matchTimestamp: '', prizePool: '', description: '' })
 
   const api = async (url, options = {}) => {
     let response

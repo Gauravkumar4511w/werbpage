@@ -104,9 +104,15 @@ function TournamentSection({ tournamentsOpen, onBack, joinedMatches, onJoinMatch
 
   useEffect(() => {
     if (!tournamentsOpen) return undefined
+    let timer
     const refreshMatchSettings = async () => {
       try {
         const response = await fetch('/api/matches/catalog')
+        if (response.status === 404) {
+          // The catalog API is not deployed here; stop polling instead of logging a 404 every 5 seconds.
+          window.clearInterval(timer)
+          return
+        }
         if (!response.ok) return
         const data = await response.json()
         const settings = new Map(data.matches.map((match) => [match.match_id, match]))
@@ -134,8 +140,8 @@ function TournamentSection({ tournamentsOpen, onBack, joinedMatches, onJoinMatch
         // Keep the local schedule available when the API is offline.
       }
     }
+    timer = window.setInterval(refreshMatchSettings, 5000)
     refreshMatchSettings()
-    const timer = window.setInterval(refreshMatchSettings, 5000)
     return () => window.clearInterval(timer)
   }, [tournamentsOpen])
 
