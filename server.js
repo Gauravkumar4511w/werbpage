@@ -27,6 +27,11 @@ try { process.loadEnvFile?.() } catch {}
 const port = Number(process.env.API_PORT || 8787)
 
 function sendJson(response, statusCode, body) {
+  if (response.headersSent) return
+  if (typeof response.status === 'function' && typeof response.json === 'function') {
+    response.status(statusCode).json(body)
+    return
+  }
   if (typeof response.setHeader === 'function') {
     response.setHeader('Content-Type', 'application/json')
   }
@@ -99,8 +104,21 @@ async function handleApiRequest(request, response) {
   }
 
   const host = request.headers?.host || 'localhost'
-  const urlObj = new URL(request.url, `http://${host}`)
-  const pathname = urlObj.pathname.replace(/\/$/, '') || '/'
+  const urlObj = new URL(request.url || '/', `http://${host}`)
+
+  let rawPath = urlObj.searchParams.get('_api_path') ||
+                urlObj.searchParams.get('_route') ||
+                urlObj.searchParams.get('route') ||
+                request.headers?.['x-matched-path'] ||
+                urlObj.pathname
+
+  if (rawPath && !rawPath.startsWith('/')) {
+    rawPath = `/api/${rawPath}`
+  } else if (rawPath && !rawPath.startsWith('/api') && rawPath !== '/') {
+    rawPath = `/api${rawPath}`
+  }
+
+  const pathname = (rawPath || '/').split('?')[0].replace(/\.js$/, '').replace(/\/$/, '') || '/'
 
   if (request.method === 'POST' && pathname === '/api/admin/login') {
     try {
