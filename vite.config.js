@@ -1,7 +1,6 @@
 import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import babel from '@rolldown/plugin-babel'
 import { defineConfig } from 'vite'
-import { handleApiRequest } from './server.js'
 
 function apiDevPlugin() {
   const mountApi = (server) => {
@@ -9,6 +8,8 @@ function apiDevPlugin() {
       const url = req.url?.split('?')[0] || ''
       if (url.startsWith('/api')) {
         try {
+          // Loaded on first request so `vite build` never opens the SQLite database.
+          const { handleApiRequest } = await import('./server.js')
           await handleApiRequest(req, res)
         } catch (error) {
           console.error('API Error in dev server:', error)

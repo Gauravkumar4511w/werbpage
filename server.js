@@ -22,7 +22,7 @@ import {
   verifyAdminSession,
 } from './lib/payout-db.js'
 
-try { process.loadEnvFile?.() } catch {}
+try { process.loadEnvFile?.() } catch { /* Deployed environments may not have a local .env file. */ }
 
 const port = Number(process.env.API_PORT || 8787)
 
@@ -106,10 +106,10 @@ async function handleApiRequest(request, response) {
   const host = request.headers?.host || 'localhost'
   const urlObj = new URL(request.url || '/', `http://${host}`)
 
-  let rawPath = urlObj.searchParams.get('_api_path') ||
+  let rawPath = request.query?._api_path ||
+                urlObj.searchParams.get('_api_path') ||
                 urlObj.searchParams.get('_route') ||
                 urlObj.searchParams.get('route') ||
-                request.headers?.['x-matched-path'] ||
                 urlObj.pathname
 
   if (rawPath && !rawPath.startsWith('/')) {

@@ -1,0 +1,7 @@
+# Deploy a single serverless function. vercel.json rewrites every /api/* request to
+# api/index.js, and server.js routes it. Hobby deployments allow at most 12 functions.
+api/*
+!api/index.js
+
+# Local SQLite database and its runtime files
+data/

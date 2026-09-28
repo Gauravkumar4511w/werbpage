@@ -73,7 +73,7 @@ function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [tournamentsOpen, setTournamentsOpen] = useState(false);
-  const [adminOpen, setAdminOpen] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(() => window.location.hash === "#admin");
   const [focusMatchId, setFocusMatchId] = useState(null);
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState("login");
@@ -544,7 +544,7 @@ function App() {
       setFocusMatchId(null);
       setLibraryOpen(false);
       setTournamentsOpen(false);
-      setAdminOpen(false);
+      setAdminOpen(window.location.hash === "#admin");
       setWalletOpen(false);
       setAuthOpen(false);
       setMenuOpen(false);
@@ -552,7 +552,11 @@ function App() {
     };
 
     window.addEventListener("popstate", handleBrowserBack);
-    return () => window.removeEventListener("popstate", handleBrowserBack);
+    window.addEventListener("hashchange", handleBrowserBack);
+    return () => {
+      window.removeEventListener("popstate", handleBrowserBack);
+      window.removeEventListener("hashchange", handleBrowserBack);
+    };
   }, []);
 
   const startUpiPayment = (amount) => {

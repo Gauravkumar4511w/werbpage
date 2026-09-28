@@ -31,7 +31,10 @@ function AdminPanel({ onBack }) {
     } catch {
       throw new Error('Cannot connect to server. Please check that the server is running.')
     }
-    const data = await response.json().catch(() => ({}))
+    const data = await response.json().catch(() => null)
+    if (response.status === 404 || (response.ok && !data)) {
+      throw new Error('Admin login service is unavailable. Please try again after the server is restarted.')
+    }
     if (!response.ok) {
       if (response.status === 401) {
         sessionStorage.removeItem('arenacore-admin-token')
@@ -84,12 +87,10 @@ function AdminPanel({ onBack }) {
     setMessage('')
     try {
       const data = await api('/api/admin/login', { method: 'POST', body: JSON.stringify({ email: email.trim(), password }) })
+      if (typeof data.token !== 'string' || !data.token) throw new Error('Invalid login response from server.')
       sessionStorage.setItem('arenacore-admin-token', data.token)
       setToken(data.token)
       setMessage('Admin dashboard ready.')
-      const response = await fetch('/api/admin/overview', { headers: { Authorization: `Bearer ${data.token}` } })
-      const overviewData = await response.json().catch(() => ({}))
-      if (response.ok) setOverview(overviewData)
     } catch (error) {
       setMessage(error.message)
     } finally {
