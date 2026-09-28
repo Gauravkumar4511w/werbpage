@@ -25,7 +25,7 @@ function AuthModal({ authOpen, setAuthOpen, authMode, setAuthMode, showPassword,
           <div className="profile-edit-heading"><span className="profile-section-label">EDIT PROFILE</span><small>Keep your player details current.</small></div>
           <form className="profile-form" onSubmit={handleProfileSubmit}>
             <label>Gamer tag<input value={profileForm.name ?? player.name} onChange={(event) => setProfileForm({ ...profileForm, name: event.target.value })} autoComplete="username" /></label>
-            <label>Email address<input type="email" value={profileForm.email ?? player.email ?? ''} onChange={(event) => setProfileForm({ ...profileForm, email: event.target.value })} autoComplete="email" required /></label>
+            <label>Email address<input type="email" value={profileForm.email ?? player.email ?? ''} onChange={(event) => setProfileForm({ ...profileForm, email: event.target.value })} placeholder="Optional for mobile accounts" autoComplete="email" /></label>
             {profileError && <p className="auth-error" role="alert">{profileError}</p>}
             <button className="auth-submit" type="submit">Save profile <span>-&gt;</span></button>
           </form>

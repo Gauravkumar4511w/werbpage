@@ -8,6 +8,7 @@ import LibrarySection from "./components/LibrarySection";
 import Navbar from "./components/Navbar";
 import TournamentSection from "./components/TournamentSection";
 import WalletModal from "./components/WalletModal";
+import { EDIT_LOCK_MS, getTeamSize } from "../lib/match-schedule.js";
 
 const userDataStorageKey = "nexus-user-data";
 
@@ -43,8 +44,35 @@ async function postJson(url, body) {
     throw new Error("Cannot reach the server. Check your connection and try again.");
   }
   const data = await response.json().catch(() => null);
-  if (!response.ok || !data) throw new Error(data?.message || "Something went wrong. Please try again.");
+  if (!response.ok || !data) {
+    throw Object.assign(new Error(data?.message || "Something went wrong. Please try again."), { status: response.status });
+  }
   return data;
+}
+
+// Match ids are compared in lower case: the server stores them that way.
+function normalizeJoinedMatches(entries) {
+  return Array.isArray(entries) ? entries.filter((entry) => entry?.id).map((entry) => ({ ...entry, id: String(entry.id).toLowerCase() })) : [];
+}
+
+// The server's entries are the truth, so a match joined on one device shows on every device.
+function joinedMatchesFromServer(entries, previous) {
+  return entries.map((entry) => {
+    const id = String(entry.matchId).toLowerCase();
+    const local = previous.find((item) => item.id === id);
+    const identifiers = entry.identifiers?.length ? entry.identifiers : local?.identifiers || [local?.identifier].filter(Boolean);
+    return {
+      id,
+      publicId: entry.publicId ? `#${entry.publicId}` : local?.publicId || "",
+      mode: entry.mode || local?.mode || "",
+      matchTimestamp: Number(entry.matchTimestamp) || local?.matchTimestamp || 0,
+      status: entry.status,
+      identifier: identifiers[0] || "",
+      identifiers,
+      roomId: entry.roomId || "",
+      roomPassword: entry.roomPassword || "",
+    };
+  });
 }
 
 function readUserData(user) {
@@ -61,7 +89,7 @@ function readUserData(user) {
         purchasedCoins,
         winningCoins,
         coins: purchasedCoins + winningCoins,
-        joinedMatches: Array.isArray(savedData.joinedMatches) ? savedData.joinedMatches : [],
+        joinedMatches: normalizeJoinedMatches(savedData.joinedMatches),
       };
     }
     const legacyCoins = Number(user?.coins) || 0;
@@ -89,7 +117,7 @@ function saveUserData(user, data) {
 function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
-  const [tournamentsOpen, setTournamentsOpen] = useState(false);
+  const [tournamentsOpen, setTournamentsOpen] = useState(() => window.location.hash === "#tournaments");
   const [adminOpen, setAdminOpen] = useState(() => window.location.hash === "#admin");
   const [focusMatchId, setFocusMatchId] = useState(null);
   const [authOpen, setAuthOpen] = useState(false);
@@ -116,6 +144,7 @@ function App() {
   const [walletMessage, setWalletMessage] = useState("");
   const [walletActivity, setWalletActivity] = useState({ payments: [], withdrawals: [] });
   const [walletSyncTick, setWalletSyncTick] = useState(0);
+  const [notice, setNotice] = useState(null);
   const paymentStatuses = useRef(null);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
   const [player, setPlayer] = useState(() => {
@@ -129,6 +158,7 @@ function App() {
   });
   const [joinedMatches, setJoinedMatches] = useState([]);
   const userDataReady = useRef(false);
+  const authSubmitting = useRef(false);
   const visibleCoins = player ? coins : 0;
   const visibleJoinedMatches = player ? joinedMatches : [];
   const [joinConfirm, setJoinConfirm] = useState(null);
@@ -232,7 +262,7 @@ function App() {
       setPurchasedCoins(savedData.purchasedCoins);
       setWinningCoins(savedData.winningCoins);
       setCoins(savedData.purchasedCoins + savedData.winningCoins);
-      setJoinedMatches(Array.isArray(savedData.joinedMatches) ? savedData.joinedMatches : []);
+      setJoinedMatches(savedData.joinedMatches);
       userDataReady.current = true;
     }, 0);
     return () => window.clearTimeout(loadTimer);
@@ -242,6 +272,26 @@ function App() {
     if (!player || !userDataReady.current) return;
     saveUserData(player, { purchasedCoins, winningCoins, coins, joinedMatches });
   }, [player, purchasedCoins, winningCoins, coins, joinedMatches]);
+
+  // Messages outside the wallet (join results, closed matches) show as a toast, so a tap is never silent.
+  useEffect(() => {
+    if (!notice) return undefined;
+    const timer = window.setTimeout(() => setNotice(null), notice.tone === "error" ? 7000 : 5000);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
+  const showNotice = (text, tone = "info") => setNotice({ text, tone, key: Date.now() });
+
+  const applyWallet = (wallet) => {
+    setPurchasedCoins(wallet.creditCoins);
+    setWinningCoins(wallet.winningCoins);
+    setCoins(wallet.totalCoins);
+    setWalletActivity({ payments: wallet.payments || [], withdrawals: wallet.withdrawals || [] });
+    if (Array.isArray(wallet.entries)) {
+      setJoinedMatches((previous) => joinedMatchesFromServer(wallet.entries, previous));
+    }
+    userDataReady.current = true;
+  };
 
   // The server wallet is the source of truth: admin approvals, adjustments, and winnings all land there.
   useEffect(() => {
@@ -254,11 +304,7 @@ function App() {
       try {
         const wallet = await postJson("/api/users/wallet", { userKey: getUserKey(player), password: player.password });
         if (!active) return;
-        setPurchasedCoins(wallet.creditCoins);
-        setWinningCoins(wallet.winningCoins);
-        setCoins(wallet.totalCoins);
-        setWalletActivity({ payments: wallet.payments || [], withdrawals: wallet.withdrawals || [] });
-        userDataReady.current = true;
+        applyWallet(wallet);
 
         const previous = paymentStatuses.current;
         paymentStatuses.current = Object.fromEntries((wallet.payments || []).map((payment) => [payment.id, payment.status]));
@@ -291,41 +337,49 @@ function App() {
     return false;
   };
 
+  const openWalletForTopUp = (neededCoins, mode) => {
+    window.history.pushState({ view: "wallet" }, "", "#wallet");
+    setWalletTab("buy");
+    setBuyAmount(String(Math.max(50, neededCoins)));
+    const message = `You need ${neededCoins.toLocaleString()} more coins to join ${mode}. Buy coins below, then tap Join again.`;
+    setWalletMessage(message);
+    showNotice(message, "error");
+    setWalletOpen(true);
+    setWalletSyncTick((tick) => tick + 1);
+  };
+
   const handleOpenJoinConfirm = (match) => {
     if (!requireLogin()) return;
 
-    const existingMatch = joinedMatches.find((entry) => entry.id === match.id);
+    const matchId = String(match.id).toLowerCase();
+    const existingMatch = joinedMatches.find((entry) => entry.id === matchId);
     const matchStartTime = Number(match.matchTimestamp || existingMatch?.matchTimestamp || 0);
 
-    if (existingMatch && matchStartTime && Date.now() >= matchStartTime - 3600000) {
-      setWalletMessage("This match is locked for changes. You can edit it only up to 1 hour before it starts.");
+    if (existingMatch) {
+      if (matchStartTime && Date.now() >= matchStartTime - EDIT_LOCK_MS) {
+        showNotice("You have joined this match. Player names are locked 1 hour before it starts.");
+        return;
+      }
+    } else if (match.status === "confirmed" || (matchStartTime && Date.now() >= matchStartTime)) {
+      showNotice("This match has already started, so joining is closed. Pick an upcoming match.", "error");
+      return;
+    } else if (match.isFull) {
+      showNotice("This match is full. Pick another match.", "error");
+      return;
+    } else if (coins < match.entryFee) {
+      openWalletForTopUp(match.entryFee - coins, match.mode);
       return;
     }
 
-    if (existingMatch && !match.entryFee) {
-      return;
-    }
-
-    if (!existingMatch && coins < match.entryFee) {
-      setWalletMessage(`You need ${match.entryFee - coins} more coins to join ${match.mode}.`);
-      return;
-    }
-
-    const playerCount = match.mode.includes("Duo") || match.mode.includes("2v2")
-      ? 2
-      : match.mode.includes("Squad") || match.mode.includes("4v4")
-        ? 4
-        : 1;
-    const savedIdentifiers = existingMatch?.identifiers || [existingMatch?.identifier || ""];
+    const playerCount = getTeamSize(match.mode);
+    const savedIdentifiers = existingMatch?.identifiers?.length ? existingMatch.identifiers : [existingMatch?.identifier || ""];
 
     setJoinConfirm({
-      matchId: match.id,
-      publicId: match.publicId,
+      matchId,
       mode: match.mode,
       cost: match.entryFee,
       playerCount,
       identifiers: Array.from({ length: playerCount }, (_, index) => savedIdentifiers[index] || (index === 0 ? player?.name?.trim() || "" : "")),
-      matchTimestamp: matchStartTime || Date.now(),
       error: "",
       isEditing: Boolean(existingMatch),
     });
@@ -333,23 +387,13 @@ function App() {
 
   const handleOpenMatchDetails = (match) => {
     if (!requireLogin()) return;
-
-    const joinedEntries = joinedMatches.filter((entry) => entry.id === match.id);
-    const existingMatch = joinedEntries[0];
-    const matchStartTime = Number(match.matchTimestamp || existingMatch?.matchTimestamp || 0);
-
-    setMatchDetails({
-      ...match,
-      matchTimestamp: matchStartTime || Date.now(),
-      joinedEntry: existingMatch || null,
-      joinedEntries,
-      roomId: match.roomId || `FF-${String(match.id).slice(-6)}`,
-      password: match.password || `pw${String(match.id).slice(-4)}`,
-    });
+    setMatchDetails({ ...match, id: String(match.id).toLowerCase() });
+    // Fetch the latest entry so room details appear as soon as the admin publishes them.
+    setWalletSyncTick((tick) => tick + 1);
   };
 
   const confirmMatchJoin = async () => {
-    if (!joinConfirm || !requireLogin()) {
+    if (!joinConfirm || joinConfirm.submitting || !requireLogin()) {
       return;
     }
 
@@ -357,64 +401,47 @@ function App() {
     if (identifiers.some((identifier) => identifier.length < 3)) {
       setJoinConfirm((previous) => ({
         ...previous,
-        error: `Enter all ${joinConfirm.playerCount} in-game names or UIDs to continue.`,
+        error: joinConfirm.playerCount > 1
+          ? `Enter all ${joinConfirm.playerCount} in-game names or UIDs (at least 3 characters each).`
+          : "Enter your in-game name or UID (at least 3 characters).",
       }));
       return;
     }
 
-    if (coins < joinConfirm.cost && !joinConfirm.isEditing) {
-      setWalletMessage(`You need ${joinConfirm.cost - coins} more coins to join ${joinConfirm.mode}.`);
-      setJoinConfirm(null);
-      return;
-    }
-
-    if (joinConfirm.submitting) return;
     setJoinConfirm((previous) => ({ ...previous, submitting: true, error: "" }));
-    let charged;
+    let result;
     try {
-      const entry = await postJson("/api/matches/entry", {
+      result = await postJson("/api/matches/entry", {
         matchId: joinConfirm.matchId,
-        publicId: joinConfirm.publicId,
-        mode: joinConfirm.mode,
-        matchTimestamp: joinConfirm.matchTimestamp,
-        entryFee: joinConfirm.cost,
+        identifiers,
         userKey: getUserKey(player),
         password: player.password,
       });
-      charged = entry.charged;
-      setPurchasedCoins(entry.wallet.creditCoins);
-      setWinningCoins(entry.wallet.winningCoins);
-      setCoins(entry.wallet.totalCoins);
     } catch (error) {
+      if (error.status === 402) {
+        const missing = Number(error.message.match(/\d+/)?.[0]) || joinConfirm.cost;
+        setJoinConfirm(null);
+        setWalletSyncTick((tick) => tick + 1);
+        openWalletForTopUp(missing, joinConfirm.mode);
+        return;
+      }
       setJoinConfirm((previous) => previous && { ...previous, submitting: false, error: error.message });
       return;
     }
 
-    const nextJoinedMatches = joinConfirm.isEditing
-      ? joinedMatches.map((entry) =>
-          entry.id === joinConfirm.matchId
-            ? { ...entry, mode: joinConfirm.mode, identifier: identifiers[0], identifiers }
-            : entry,
-        )
-      : [...joinedMatches, {
-          id: joinConfirm.matchId,
-          mode: joinConfirm.mode,
-          identifier: identifiers[0],
-          identifiers,
-          matchTimestamp: joinConfirm.matchTimestamp,
-        }];
-    setJoinedMatches(nextJoinedMatches);
-
-    setWalletMessage(
+    applyWallet(result.wallet);
+    showNotice(
       joinConfirm.isEditing
-        ? `${joinConfirm.mode} details updated for ${identifiers.join(", ")}.`
-        : `${joinConfirm.mode} joined successfully for ${identifiers.join(", ")}. ${charged.toLocaleString()} coins deducted.`,
+        ? `${joinConfirm.mode}: player names updated.`
+        : `Joined ${joinConfirm.mode}! ${result.charged.toLocaleString()} coins deducted. Room ID and password appear in the match details 10 minutes before the start.`,
+      "success",
     );
     setJoinConfirm(null);
   };
 
-  const handleAuthSubmit = (event) => {
+  const handleAuthSubmit = async (event) => {
     event.preventDefault();
+    if (authSubmitting.current) return;
     const { username, email, phone, password, signupMethod } = form;
 
     if (authMode === "signup" && username.trim().length < 3) {
@@ -473,15 +500,29 @@ function App() {
       const loginValue = (form.loginMethod === "email" ? email : phone)
         .trim()
         .toLowerCase();
-      const account = registeredUsers.find(
+      let account = registeredUsers.find(
         (user) =>
           user[form.loginMethod] === loginValue && user.password === password,
       );
       if (!account) {
-        setAuthError(
-          "No account found with these credentials. Please sign up first.",
-        );
-        return;
+        // Accounts made on another phone or browser are only on the server.
+        authSubmitting.current = true;
+        try {
+          const { user } = await postJson("/api/users/login", {
+            login: loginValue,
+            password,
+            sessionId: sessionStorage.getItem("nexus-session-id") || undefined,
+          });
+          account = { name: user.name, email: user.email || "", phone: user.phone || "", password, userKey: user.userKey, coins: 0, status: "active" };
+          const nextUsers = [...registeredUsers.filter((item) => getUserKey(item) !== user.userKey), account];
+          localStorage.setItem("nexus-registered-users", JSON.stringify(nextUsers));
+          setRegisteredUsers(nextUsers);
+        } catch (error) {
+          setAuthError(error.message);
+          return;
+        } finally {
+          authSubmitting.current = false;
+        }
       }
       const loginCoins = Number(account.coins) || 0;
       setCoins(loginCoins);
@@ -534,6 +575,24 @@ function App() {
       );
       return;
     }
+
+    // Save the account on the server first: that is what lets it log in and join on any device.
+    authSubmitting.current = true;
+    try {
+      await postJson("/api/users/register", {
+        userKey: nextPlayer.userKey,
+        displayName: nextPlayer.name,
+        email: nextPlayer.email,
+        phone: nextPlayer.phone,
+        password: nextPlayer.password,
+        sessionId: sessionStorage.getItem("nexus-session-id") || undefined,
+      });
+    } catch (error) {
+      setAuthError(error.message);
+      return;
+    } finally {
+      authSubmitting.current = false;
+    }
     const nextUsers = [...registeredUsers, nextPlayer];
     const nextNames =
       authMode === "signup"
@@ -556,26 +615,8 @@ function App() {
       loginMethod: "email",
     });
 
-    // Immediately persist and activate user in backend DB so Admin Desk counts them
-    const newUserKey = nextPlayer.userKey;
-    void fetch("/api/users/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userKey: newUserKey,
-        displayName: nextPlayer.name,
-        email: nextPlayer.email,
-        phone: nextPlayer.phone,
-        password: nextPlayer.password,
-        status: "active",
-        sessionId: sessionStorage.getItem("nexus-session-id") || undefined,
-      }),
-    }).then(async (res) => {
-      if (res.ok) {
-        fetch("/api/presence/stats").then(r => r.json()).then(stats => {
-          if (stats?.liveCount) setLiveCount(stats.liveCount);
-        }).catch(() => {});
-      }
+    fetch("/api/presence/stats").then((response) => response.json()).then((stats) => {
+      if (stats?.liveCount) setLiveCount(stats.liveCount);
     }).catch(() => {});
   };
 
@@ -602,14 +643,12 @@ function App() {
 
     if (trimmedName.length < 3)
       return "Choose a gamer tag with at least 3 characters.";
-    if (!/^\S+@\S+\.\S+$/.test(trimmedEmail))
+    if (trimmedEmail && !/^\S+@\S+\.\S+$/.test(trimmedEmail))
       return "Enter a valid email address.";
 
     const nextPlayer = { ...player, userKey: getUserKey(player), name: trimmedName, email: trimmedEmail };
     const nextUsers = registeredUsers.map((user) => (
-      user.email === player.email || user.phone === player.phone
-        ? nextPlayer
-        : user
+      getUserKey(user) === nextPlayer.userKey ? nextPlayer : user
     ));
     saveUserData(nextPlayer, { purchasedCoins, winningCoins, coins, joinedMatches });
     localStorage.setItem("nexus-player", JSON.stringify(nextPlayer));
@@ -626,7 +665,7 @@ function App() {
         displayName: nextPlayer.name,
         email: nextPlayer.email,
         phone: nextPlayer.phone,
-        status: "active",
+        password: nextPlayer.password,
       }),
     }).catch(() => {});
 
@@ -805,6 +844,9 @@ function App() {
     setWithdrawalScreenshot(null);
   };
 
+  const detailsEntry = matchDetails ? visibleJoinedMatches.find((entry) => entry.id === matchDetails.id) : null;
+  const detailsStarted = Boolean(matchDetails?.matchTimestamp) && currentTime >= matchDetails.matchTimestamp;
+
   return (
     <main className="gaming-page">
       <Navbar
@@ -853,7 +895,6 @@ function App() {
           joinedMatches={visibleJoinedMatches}
           onJoinMatch={handleOpenJoinConfirm}
           onMatchDetails={handleOpenMatchDetails}
-          coinBalance={visibleCoins}
           focusMatchId={focusMatchId}
         />
       ) : libraryOpen ? (
@@ -921,7 +962,7 @@ function App() {
         />
       )}
       {matchDetails && (
-        <div className="join-confirm-backdrop" role="dialog" aria-modal="true">
+        <div className="join-confirm-backdrop" role="dialog" aria-modal="true" onMouseDown={(event) => event.target === event.currentTarget && setMatchDetails(null)}>
           <div className="join-confirm-modal match-details-modal">
             <button
               type="button"
@@ -935,15 +976,14 @@ function App() {
             <div className="match-detail-shell">
               <div className="match-detail-header">
                 <div>
-                  <p className="join-confirm-kicker">match briefing</p>
+                  <p className="join-confirm-kicker">match briefing {matchDetails.publicId}</p>
                   <h3>{matchDetails.mode}</h3>
                 </div>
-                <span className="match-detail-pill">{currentTime >= matchDetails.matchTimestamp ? "Live" : "Queued"}</span>
+                <span className="match-detail-pill">{detailsStarted ? "Live" : "Queued"}</span>
               </div>
 
               <div className="match-detail-banner">
-                <div className="match-deta
-                  il-banner-glow" />
+                <div className="match-detail-banner-glow" />
                 <img src={freeFireMaxIcon} alt="Free Fire MAX" />
                 <div className="match-detail-banner-overlay">
                   <span>Squad arena</span>
@@ -954,20 +994,20 @@ function App() {
               <div className="match-detail-grid">
                 <div>
                   <span>Entry</span>
-                  <strong>{matchDetails.entryFee.toLocaleString()} coins</strong>
+                  <strong>{Number(matchDetails.entryFee || 0).toLocaleString()} coins</strong>
                 </div>
                 <div>
                   <span>Start</span>
                   <strong>
-                    {new Date(matchDetails.matchTimestamp).toLocaleString([], {
+                    {matchDetails.matchTimestamp ? new Date(matchDetails.matchTimestamp).toLocaleString([], {
                       dateStyle: "medium",
                       timeStyle: "short",
-                    })}
+                    }) : "To be announced"}
                   </strong>
                 </div>
                 <div>
                   <span>Status</span>
-                    <strong>{currentTime >= matchDetails.matchTimestamp ? "Started" : "Waiting"}</strong>
+                  <strong>{detailsStarted ? "Started" : "Waiting"}</strong>
                 </div>
               </div>
 
@@ -979,19 +1019,17 @@ function App() {
                   <div className="match-prize-box"><span>Prize pool</span><strong>{Number(matchDetails.prizePool).toLocaleString()} coins</strong></div>
                 )}
 
-                {matchDetails.joinedEntries?.length > 0 && (
+                {detailsEntry && (
                   <div className="match-player-list">
-                    <span className="match-player-list-title">Joined teams</span>
-                    {matchDetails.joinedEntries.map((team, teamIndex) => (
-                      <div className="match-team-roster" key={`${team.id}-${teamIndex}`}>
-                        <span className="match-team-label">Team {teamIndex + 1}</span>
-                        <div>
-                          {(team.identifiers || [team.identifier]).filter(Boolean).map((identifier, playerIndex) => (
-                            <span className="match-player-name" key={`${identifier}-${playerIndex}`}>{identifier}</span>
-                          ))}
-                        </div>
+                    <span className="match-player-list-title">Your team</span>
+                    <div className="match-team-roster">
+                      <span className="match-team-label">Joined</span>
+                      <div>
+                        {(detailsEntry.identifiers?.length ? detailsEntry.identifiers : [detailsEntry.identifier]).filter(Boolean).map((identifier, playerIndex) => (
+                          <span className="match-player-name" key={`${identifier}-${playerIndex}`}>{identifier}</span>
+                        ))}
                       </div>
-                    ))}
+                    </div>
                   </div>
                 )}
 
@@ -1005,23 +1043,29 @@ function App() {
                   </ol>
                 </div>
 
-                {matchDetails.joinedEntry ? (
-                  currentTime < matchDetails.matchTimestamp ? (
+                {detailsEntry ? (
+                  detailsEntry.roomId ? (
                     <div className="room-info-box">
                       <div className="room-info-row">
                         <span>Room ID</span>
-                        <strong>{matchDetails.roomId}</strong>
+                        <strong>{detailsEntry.roomId}</strong>
                       </div>
                       <div className="room-info-row">
                         <span>Password</span>
-                        <strong>{matchDetails.password}</strong>
+                        <strong>{detailsEntry.roomPassword || "No password"}</strong>
                       </div>
                     </div>
                   ) : (
-                    <p className="match-detail-lock">This match has started, so room credentials are no longer visible.</p>
+                    <p className="match-detail-lock">
+                      {currentTime < matchDetails.matchTimestamp - 10 * 60 * 1000
+                        ? "You're in! The room ID and password will appear here 10 minutes before the match starts."
+                        : "The room ID and password will appear here as soon as the admin publishes them. Keep this open."}
+                    </p>
                   )
+                ) : detailsStarted ? (
+                  <p className="match-detail-lock">This match has already started, so joining is closed.</p>
                 ) : (
-                  <p className="match-detail-lock">Join this match to unlock the room ID and password before the match starts.</p>
+                  <p className="match-detail-lock">Join this match to get the room ID and password 10 minutes before the start.</p>
                 )}
               </div>
             </div>
@@ -1030,7 +1074,7 @@ function App() {
               <button type="button" className="join-confirm-secondary" onClick={() => setMatchDetails(null)}>
                 Close
               </button>
-              {!matchDetails.joinedEntry && (
+              {!detailsEntry && !detailsStarted && (
                 <button
                   type="button"
                   className="join-confirm-primary"
@@ -1060,37 +1104,53 @@ function App() {
             <p className="join-confirm-kicker">match entry</p>
             <h3>{joinConfirm.mode}</h3>
             <p className="join-confirm-text">
-              This match will use <strong>{joinConfirm.cost.toLocaleString()} coins</strong> from your wallet.
+              {joinConfirm.isEditing
+                ? "Update your team's in-game names. No extra coins are charged."
+                : <>This match will use <strong>{joinConfirm.cost.toLocaleString()} coins</strong> from your wallet ({visibleCoins.toLocaleString()} available).</>}
             </p>
-            <div className="join-confirm-players">
-              {joinConfirm.identifiers.map((identifier, index) => (
-                <label className="join-confirm-field" key={`player-${index + 1}`}>
-                  {joinConfirm.playerCount > 1 ? `Player ${index + 1} in-game name or UID` : "In-game name or UID"}
-                  <input
-                    type="text"
-                    value={identifier}
-                    onChange={(event) => setJoinConfirm((previous) => ({
-                      ...previous,
-                      identifiers: previous.identifiers.map((value, valueIndex) => valueIndex === index ? event.target.value : value),
-                      error: "",
-                    }))}
-                    placeholder={`Enter player ${index + 1} name or UID`}
-                    maxLength={24}
-                    autoFocus={index === 0}
-                  />
-                </label>
-              ))}
-            </div>
-            {joinConfirm.error && <p className="join-confirm-error">{joinConfirm.error}</p>}
-            <div className="join-confirm-actions">
-              <button type="button" className="join-confirm-secondary" onClick={() => setJoinConfirm(null)}>
-                Cancel
-              </button>
-              <button type="button" className="join-confirm-primary" onClick={confirmMatchJoin} disabled={joinConfirm.submitting}>
-                {joinConfirm.submitting ? "Joining..." : "OK"}
-              </button>
-            </div>
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                confirmMatchJoin();
+              }}
+            >
+              <div className="join-confirm-players">
+                {joinConfirm.identifiers.map((identifier, index) => (
+                  <label className="join-confirm-field" key={`player-${index + 1}`}>
+                    {joinConfirm.playerCount > 1 ? `Player ${index + 1} in-game name or UID` : "In-game name or UID"}
+                    <input
+                      type="text"
+                      value={identifier}
+                      onChange={(event) => setJoinConfirm((previous) => ({
+                        ...previous,
+                        identifiers: previous.identifiers.map((value, valueIndex) => valueIndex === index ? event.target.value : value),
+                        error: "",
+                      }))}
+                      placeholder={`Enter player ${index + 1} name or UID`}
+                      maxLength={24}
+                      autoComplete="off"
+                      enterKeyHint={index === joinConfirm.identifiers.length - 1 ? "done" : "next"}
+                    />
+                  </label>
+                ))}
+              </div>
+              {joinConfirm.error && <p className="join-confirm-error" role="alert">{joinConfirm.error}</p>}
+              <div className="join-confirm-actions">
+                <button type="button" className="join-confirm-secondary" onClick={() => setJoinConfirm(null)}>
+                  Cancel
+                </button>
+                <button type="submit" className="join-confirm-primary" disabled={joinConfirm.submitting}>
+                  {joinConfirm.submitting ? "Joining..." : joinConfirm.isEditing ? "Save" : "Confirm & join"}
+                </button>
+              </div>
+            </form>
           </div>
+        </div>
+      )}
+      {notice && (
+        <div className={`app-notice is-${notice.tone}`} role={notice.tone === "error" ? "alert" : "status"} key={notice.key}>
+          <span>{notice.text}</span>
+          <button type="button" aria-label="Dismiss message" onClick={() => setNotice(null)}>×</button>
         </div>
       )}
     </main>

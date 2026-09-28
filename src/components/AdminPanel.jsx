@@ -7,6 +7,13 @@ const matchModes = ['Battle Royale Solo', 'Battle Royale Duo', 'Battle Royale Sq
 const defaultFees = { 'Battle Royale Solo': 50, 'Battle Royale Duo': 100, 'Battle Royale Squad': 150, 'Clash Squad 1v1': 50, 'Clash Squad 2v2': 100, 'Clash Squad 4v4': 200, 'Lone Wolf 1v1': 75 }
 const adminTitle = 'ADMIN DESK · ARENACORE'
 
+// datetime-local inputs show local time; toISOString() is UTC and shifted IST matches by 5.5 hours on save.
+function toLocalInputValue(timestamp) {
+  if (!timestamp) return ''
+  const date = new Date(timestamp)
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+}
+
 function playAlertSound() {
   try {
     const AudioContext = window.AudioContext || window.webkitAudioContext
@@ -62,7 +69,7 @@ function AdminPanel({ onBack }) {
   const [resultForm, setResultForm] = useState({ matchId: '', winnerTeamKey: '' })
   const [matchLookup, setMatchLookup] = useState('')
   const [selectedMatch, setSelectedMatch] = useState(null)
-  const [matchForm, setMatchForm] = useState({ entryFee: '', matchTimestamp: '', prizePool: '', description: '' })
+  const [matchForm, setMatchForm] = useState({ entryFee: '', matchTimestamp: '', prizePool: '', description: '', roomId: '', roomPassword: '' })
   const [createForm, setCreateForm] = useState({ mode: matchModes[0], entryFee: String(defaultFees[matchModes[0]]), matchTimestamp: '', prizePool: '', description: '' })
   const lastNotificationId = useRef(null)
 
@@ -334,9 +341,11 @@ function AdminPanel({ onBack }) {
     setMatchLookup(match.public_id ? `#${match.public_id}` : match.match_id)
     setMatchForm({
       entryFee: String(match.entry_fee),
-      matchTimestamp: match.match_timestamp ? new Date(match.match_timestamp).toISOString().slice(0, 16) : '',
+      matchTimestamp: toLocalInputValue(match.match_timestamp),
       prizePool: match.prize_pool === null ? '' : String(match.prize_pool),
       description: match.description || '',
+      roomId: match.room_id || '',
+      roomPassword: match.room_password || '',
     })
     setMessage('Match details loaded.')
   }
@@ -353,6 +362,8 @@ function AdminPanel({ onBack }) {
           matchTimestamp: matchForm.matchTimestamp ? new Date(matchForm.matchTimestamp).getTime() : '',
           prizePool: matchForm.prizePool === '' ? '' : Number(matchForm.prizePool),
           description: matchForm.description,
+          roomId: matchForm.roomId,
+          roomPassword: matchForm.roomPassword,
         }),
       })
       setMessage('Match settings updated. Players will see the changes on their next refresh.')
@@ -362,9 +373,11 @@ function AdminPanel({ onBack }) {
         setSelectedMatch(updatedMatch)
         setMatchForm({
           entryFee: String(updatedMatch.entry_fee),
-          matchTimestamp: updatedMatch.match_timestamp ? new Date(updatedMatch.match_timestamp).toISOString().slice(0, 16) : '',
+          matchTimestamp: toLocalInputValue(updatedMatch.match_timestamp),
           prizePool: updatedMatch.prize_pool === null ? '' : String(updatedMatch.prize_pool),
           description: updatedMatch.description || '',
+          roomId: updatedMatch.room_id || '',
+          roomPassword: updatedMatch.room_password || '',
         })
       }
     } catch (error) { setMessage(error.message) }
@@ -657,7 +670,7 @@ function CopyButton({ value }) {
 }
 
 function MatchControl({ match, entries, kills, form, setForm, onSubmit, onDelete }) {
-  return <section className="admin-match-control"><div className="admin-card-heading"><div><h2>#{match.public_id || '------'} · {match.mode || 'Match'}</h2><span>{match.status} · {entries.length} joined players</span></div><button className="admin-delete-button" type="button" onClick={onDelete}>Delete match</button></div><div className="admin-match-columns"><div><h3>Joined players</h3><div className="admin-player-list">{entries.length ? entries.map((entry) => <div key={`${entry.team_key}-${entry.user_key}`}><strong>{entry.team_key}</strong><span>{entry.user_key}</span><small>{kills.find((item) => item.user_key === entry.user_key)?.kills || 0} kills</small></div>) : <p>No players recorded.</p>}</div></div><form className="admin-match-form" onSubmit={onSubmit}><label>Entry fee<input type="number" min="1" value={form.entryFee} onChange={(event) => setForm({ ...form, entryFee: event.target.value })} required /></label><label>Match time<input type="datetime-local" value={form.matchTimestamp} onChange={(event) => setForm({ ...form, matchTimestamp: event.target.value })} /></label><label>Prize payout override<input type="number" min="0" value={form.prizePool} onChange={(event) => setForm({ ...form, prizePool: event.target.value })} placeholder="Default: 80% pool" /></label><label>Match description<textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Per kill 20 Rs... or Prize pool 40 Rs..." rows="4" /></label><button type="submit">Save match changes</button></form></div></section>
+  return <section className="admin-match-control"><div className="admin-card-heading"><div><h2>#{match.public_id || '------'} · {match.mode || 'Match'}</h2><span>{match.status} · {entries.length} joined players</span></div><button className="admin-delete-button" type="button" onClick={onDelete}>Delete match</button></div><div className="admin-match-columns"><div><h3>Joined players</h3><div className="admin-player-list">{entries.length ? entries.map((entry) => <div key={`${entry.team_key}-${entry.user_key}`}><strong>{entry.team_key}</strong><span>{entry.identifiers?.length ? entry.identifiers.join(', ') : entry.user_key}</span><small>{kills.find((item) => item.user_key === entry.user_key)?.kills || 0} kills</small></div>) : <p>No players recorded.</p>}</div></div><form className="admin-match-form" onSubmit={onSubmit}><label>Entry fee<input type="number" min="1" value={form.entryFee} onChange={(event) => setForm({ ...form, entryFee: event.target.value })} required /></label><label>Match time<input type="datetime-local" value={form.matchTimestamp} onChange={(event) => setForm({ ...form, matchTimestamp: event.target.value })} /></label><label>Prize payout override<input type="number" min="0" value={form.prizePool} onChange={(event) => setForm({ ...form, prizePool: event.target.value })} placeholder="Default: 80% pool" /></label><label>Match description<textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Per kill 20 Rs... or Prize pool 40 Rs..." rows="4" /></label><label>Room ID<input value={form.roomId} onChange={(event) => setForm({ ...form, roomId: event.target.value })} placeholder="Shown to joined players 10 min before start" maxLength={40} /></label><label>Room password<input value={form.roomPassword} onChange={(event) => setForm({ ...form, roomPassword: event.target.value })} placeholder="Room password" maxLength={40} /></label><button type="submit">Save match changes</button></form></div></section>
 }
 
 function DataTable({ title, columns, rows, onRowClick }) {

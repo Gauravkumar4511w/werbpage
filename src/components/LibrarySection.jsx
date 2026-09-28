@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 const knownModes = ['Battle Royale Solo', 'Battle Royale Duo', 'Battle Royale Squad', 'Clash Squad 1v1', 'Clash Squad 2v2', 'Clash Squad 4v4', 'Lone Wolf 1v1']
 
 function getMatchMode(match) {
-  return match.mode || knownModes.find((mode) => String(match.id || '').endsWith(`-${mode}`)) || 'Joined match'
+  return match.mode || knownModes.find((mode) => String(match.id || '').toLowerCase().endsWith(`-${mode.toLowerCase()}`)) || 'Joined match'
 }
 
 function getMatchTimestamp(match) {

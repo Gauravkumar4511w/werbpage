@@ -935,3 +935,27 @@ body { background: #07111c; }
 .wallet-history-row em.is-approved { color: #8fc99b; }
 .wallet-history-row em.is-rejected { color: #e98778; }
 .wallet-history-row p { grid-column: 1 / -1; margin: 2px 0 0; color: #e98778; font-size: 10px; }
+
+/* Join flow on phones: the popups sit above the fixed mobile navbar, and scroll when they are
+   taller than the screen (long match briefing, squad names, open keyboard), so the buttons stay reachable. */
+.join-confirm-backdrop { z-index: 120; display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.join-confirm-backdrop > .join-confirm-modal { flex-shrink: 0; margin: auto; }
+.join-confirm-players { max-height: none; overflow: visible; }
+.join-confirm-field input { font-size: 16px; }
+.join-confirm-primary:disabled { opacity: .6; cursor: wait; }
+.scheduled-match .match-action { min-width: 0; }
+.scheduled-match button { touch-action: manipulation; }
+.scheduled-match button:disabled { opacity: .5; cursor: not-allowed; }
+@media (max-width: 760px) {
+  .join-confirm-backdrop { padding: 16px 12px calc(16px + env(safe-area-inset-bottom)); }
+  .join-confirm-actions button { min-height: 44px; }
+}
+
+/* Player notices: join results and closed matches */
+.app-notice { position: fixed; z-index: 130; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); left: 16px; display: flex; align-items: flex-start; gap: 12px; max-width: 460px; margin: 0 auto; padding: 13px 14px; border: 1px solid rgba(105,200,255,.45); color: #eef6fb; background: rgba(8,18,30,.97); box-shadow: 0 18px 40px rgba(0,0,0,.45); font-size: 13px; line-height: 1.45; }
+.app-notice span { flex: 1; }
+.app-notice button { flex: none; width: 28px; height: 28px; border: 1px solid rgba(255,255,255,.18); color: inherit; background: transparent; font-size: 18px; line-height: 1; cursor: pointer; }
+.app-notice.is-success { border-color: rgba(143,201,155,.7); }
+.app-notice.is-error { border-color: rgba(233,135,120,.75); }
+.match-details-modal .match-detail-header { padding-right: 40px; }
+.join-confirm-close { z-index: 2; }

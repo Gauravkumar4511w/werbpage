@@ -22,6 +22,7 @@ import {
   verifyAdminSession,
   recordUserPresence,
   getLiveStats,
+  loginUser,
   registerOrUpdateUser,
   syncUsers,
   adminSetUserStatus,
@@ -237,7 +238,19 @@ async function handleApiRequest(request, response) {
       }
       sendJson(response, 200, { success: true, user })
     } catch (error) {
-      sendJson(response, 400, { message: error instanceof Error ? error.message : 'Could not register user.' })
+      sendError(response, error, 'Could not register user.')
+    }
+    return
+  }
+
+  if (request.method === 'POST' && pathname === '/api/users/login') {
+    try {
+      const body = await readBody(request)
+      const user = loginUser(body)
+      if (body.sessionId) recordUserPresence({ sessionId: body.sessionId, userKey: user.userKey })
+      sendJson(response, 200, { user })
+    } catch (error) {
+      sendError(response, error, 'Could not log in.')
     }
     return
   }
@@ -257,7 +270,7 @@ async function handleApiRequest(request, response) {
     if (!requireAdmin(request, response)) return
     try {
       const body = await readBody(request)
-      let user = registerOrUpdateUser({ ...body, status: 'active' })
+      let user = registerOrUpdateUser({ ...body, status: 'active' }, { trusted: true })
       const openingCoins = Number(body.creditCoins) || 0
       if (openingCoins > 0) {
         user = adjustUserBalance({ userKey: user.user_key, amount: openingCoins, wallet: 'credit', note: 'Opening balance' })
@@ -373,6 +386,7 @@ async function handleApiRequest(request, response) {
   }
 
   if (request.method === 'POST' && pathname === '/api/matches/catalog') {
+    if (!requireAdmin(request, response)) return
     try {
       registerMatchCatalog((await readBody(request)).matches)
       sendJson(response, 201, { recorded: true })
