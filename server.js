@@ -3,7 +3,7 @@ import crypto from 'node:crypto'
 import http from 'node:http'
 import { fileURLToPath } from 'node:url'
 import {
-  adjustCreditCoins,
+  adjustUserBalance,
   authenticateAdmin,
   confirmMatchResult,
   createAdminMatch,
@@ -25,6 +25,12 @@ import {
   registerOrUpdateUser,
   syncUsers,
   adminSetUserStatus,
+  getAdminNotifications,
+  markAdminNotificationsRead,
+  getAdminUserDetail,
+  getAuthorizedWallet,
+  reviewPaymentRequest,
+  reviewWithdrawalRequest,
 } from './lib/payout-db.js'
 
 try { process.loadEnvFile?.() } catch { /* Deployed environments may not have a local .env file. */ }
@@ -74,6 +80,10 @@ function hasRazorpayConfig() {
     !process.env.RAZORPAY_KEY_ID.startsWith('your_') &&
     !process.env.RAZORPAY_KEY_SECRET.startsWith('your_'),
   )
+}
+
+function sendError(response, error, fallbackMessage) {
+  sendJson(response, error?.status || 400, { message: error instanceof Error ? error.message : fallbackMessage })
 }
 
 function getAdminToken(request) {
@@ -247,11 +257,11 @@ async function handleApiRequest(request, response) {
     if (!requireAdmin(request, response)) return
     try {
       const body = await readBody(request)
-      const user = registerOrUpdateUser({
-        ...body,
-        creditCoins: body.creditCoins || 0,
-        status: 'active',
-      })
+      let user = registerOrUpdateUser({ ...body, status: 'active' })
+      const openingCoins = Number(body.creditCoins) || 0
+      if (openingCoins > 0) {
+        user = adjustUserBalance({ userKey: user.user_key, amount: openingCoins, wallet: 'credit', note: 'Opening balance' })
+      }
       sendJson(response, 201, { success: true, user })
     } catch (error) {
       sendJson(response, 400, { message: error instanceof Error ? error.message : 'Could not create user.' })
@@ -266,17 +276,68 @@ async function handleApiRequest(request, response) {
       const user = adminSetUserStatus(body)
       sendJson(response, 200, { success: true, user })
     } catch (error) {
-      sendJson(response, 400, { message: error instanceof Error ? error.message : 'Could not update user status.' })
+      sendError(response, error, 'Could not update user status.')
     }
     return
   }
 
-  if (request.method === 'POST' && pathname === '/api/admin/users/credit') {
+  if (request.method === 'POST' && (pathname === '/api/admin/users/balance' || pathname === '/api/admin/users/credit')) {
     if (!requireAdmin(request, response)) return
     try {
-      sendJson(response, 200, { user: adjustCreditCoins(await readBody(request)) })
+      sendJson(response, 200, { user: adjustUserBalance(await readBody(request)) })
     } catch (error) {
-      sendJson(response, 400, { message: error instanceof Error ? error.message : 'Could not update credits.' })
+      sendError(response, error, 'Could not update the balance.')
+    }
+    return
+  }
+
+  if (request.method === 'GET' && pathname === '/api/admin/users/detail') {
+    if (!requireAdmin(request, response)) return
+    try {
+      sendJson(response, 200, getAdminUserDetail(request.query?.userKey || urlObj.searchParams.get('userKey')))
+    } catch (error) {
+      sendError(response, error, 'Could not load the user.')
+    }
+    return
+  }
+
+  if (request.method === 'GET' && pathname === '/api/admin/notifications') {
+    if (!requireAdmin(request, response)) return
+    sendJson(response, 200, getAdminNotifications())
+    return
+  }
+
+  if (request.method === 'POST' && pathname === '/api/admin/notifications/read') {
+    if (!requireAdmin(request, response)) return
+    sendJson(response, 200, markAdminNotificationsRead(await readBody(request)))
+    return
+  }
+
+  if (request.method === 'POST' && pathname === '/api/admin/payments/review') {
+    if (!requireAdmin(request, response)) return
+    try {
+      sendJson(response, 200, reviewPaymentRequest(await readBody(request)))
+    } catch (error) {
+      sendError(response, error, 'Could not review the payment.')
+    }
+    return
+  }
+
+  if (request.method === 'POST' && pathname === '/api/admin/withdrawals/review') {
+    if (!requireAdmin(request, response)) return
+    try {
+      sendJson(response, 200, reviewWithdrawalRequest(await readBody(request)))
+    } catch (error) {
+      sendError(response, error, 'Could not review the withdrawal.')
+    }
+    return
+  }
+
+  if (request.method === 'POST' && pathname === '/api/users/wallet') {
+    try {
+      sendJson(response, 200, getAuthorizedWallet(await readBody(request)))
+    } catch (error) {
+      sendError(response, error, 'Could not load the wallet.')
     }
     return
   }
@@ -294,20 +355,19 @@ async function handleApiRequest(request, response) {
 
   if (request.method === 'POST' && pathname === '/api/payments/request') {
     try {
-      recordPaymentRequest(await readBody(request))
-      sendJson(response, 201, { recorded: true })
+      const payment = recordPaymentRequest(await readBody(request))
+      sendJson(response, 201, { recorded: true, payment })
     } catch (error) {
-      sendJson(response, 400, { message: error instanceof Error ? error.message : 'Could not record payment request.' })
+      sendError(response, error, 'Could not record payment request.')
     }
     return
   }
 
   if (request.method === 'POST' && pathname === '/api/matches/entry') {
     try {
-      recordMatchEntry(await readBody(request))
-      sendJson(response, 201, { recorded: true })
+      sendJson(response, 201, { recorded: true, ...recordMatchEntry(await readBody(request)) })
     } catch (error) {
-      sendJson(response, 400, { message: error instanceof Error ? error.message : 'Could not record match entry.' })
+      sendError(response, error, 'Could not record match entry.')
     }
     return
   }
@@ -329,10 +389,9 @@ async function handleApiRequest(request, response) {
 
   if (request.method === 'POST' && pathname === '/api/withdrawals/request') {
     try {
-      recordWithdrawalRequest(await readBody(request))
-      sendJson(response, 201, { recorded: true })
+      sendJson(response, 201, { recorded: true, ...recordWithdrawalRequest(await readBody(request)) })
     } catch (error) {
-      sendJson(response, 400, { message: error instanceof Error ? error.message : 'Could not record withdrawal request.' })
+      sendError(response, error, 'Could not record withdrawal request.')
     }
     return
   }

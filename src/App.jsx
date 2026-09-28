@@ -26,8 +26,25 @@ function readPendingPayment() {
   }
 }
 
+// The key is fixed at sign-up so later profile edits never move the player to a different wallet.
 function getUserKey(user) {
-  return (user?.email || user?.phone || user?.name || "guest").trim().toLowerCase();
+  return (user?.userKey || user?.email || user?.phone || user?.name || "guest").trim().toLowerCase();
+}
+
+async function postJson(url, body) {
+  let response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new Error("Cannot reach the server. Check your connection and try again.");
+  }
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data) throw new Error(data?.message || "Something went wrong. Please try again.");
+  return data;
 }
 
 function readUserData(user) {
@@ -97,6 +114,9 @@ function App() {
   });
   const [withdrawalScreenshot, setWithdrawalScreenshot] = useState(null);
   const [walletMessage, setWalletMessage] = useState("");
+  const [walletActivity, setWalletActivity] = useState({ payments: [], withdrawals: [] });
+  const [walletSyncTick, setWalletSyncTick] = useState(0);
+  const paymentStatuses = useRef(null);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
   const [player, setPlayer] = useState(() => {
     const savedPlayer = localStorage.getItem("nexus-player");
@@ -223,40 +243,44 @@ function App() {
     saveUserData(player, { purchasedCoins, winningCoins, coins, joinedMatches });
   }, [player, purchasedCoins, winningCoins, coins, joinedMatches]);
 
+  // The server wallet is the source of truth: admin approvals, adjustments, and winnings all land there.
   useEffect(() => {
-    if (!player) return;
+    if (!player) {
+      paymentStatuses.current = null;
+      return undefined;
+    }
+    let active = true;
+    const syncWallet = async () => {
+      try {
+        const wallet = await postJson("/api/users/wallet", { userKey: getUserKey(player), password: player.password });
+        if (!active) return;
+        setPurchasedCoins(wallet.creditCoins);
+        setWinningCoins(wallet.winningCoins);
+        setCoins(wallet.totalCoins);
+        setWalletActivity({ payments: wallet.payments || [], withdrawals: wallet.withdrawals || [] });
+        userDataReady.current = true;
 
-    const params = new URLSearchParams(window.location.search);
-    const paymentStatus = params.get("payment");
-    const orderCoins = Number(params.get("coins") || "0");
-    if (paymentStatus !== "success" || !Number.isInteger(orderCoins) || orderCoins <= 0) return;
-
-    const savedData = readUserData(player);
-    const nextPurchasedCoins = savedData.purchasedCoins + orderCoins;
-    const nextCoins = nextPurchasedCoins + savedData.winningCoins;
-    saveUserData(player, { ...savedData, purchasedCoins: nextPurchasedCoins, coins: nextCoins });
-
-    const updatedPlayer = { ...player, coins: nextCoins };
-    const updatedUsers = registeredUsers.map((user) => (
-      user.email === updatedPlayer.email || user.phone === updatedPlayer.phone
-        ? updatedPlayer
-        : user
-    ));
-    localStorage.setItem("nexus-player", JSON.stringify(updatedPlayer));
-    localStorage.setItem("nexus-registered-users", JSON.stringify(updatedUsers));
-    const paymentTimer = window.setTimeout(() => {
-      setPurchasedCoins(nextPurchasedCoins);
-      setCoins(nextCoins);
-      setPlayer(updatedPlayer);
-      setRegisteredUsers(updatedUsers);
-      setWalletMessage(`Payment successful! ${orderCoins.toLocaleString()} coins added to your wallet.`);
-
-      const nextUrl = new URL(window.location.href);
-      nextUrl.search = "";
-      window.history.replaceState({}, "", nextUrl);
-    }, 0);
-    return () => window.clearTimeout(paymentTimer);
-  }, [player, registeredUsers]);
+        const previous = paymentStatuses.current;
+        paymentStatuses.current = Object.fromEntries((wallet.payments || []).map((payment) => [payment.id, payment.status]));
+        const reviewed = previous ? (wallet.payments || []).filter((payment) => previous[payment.id] === "pending" && payment.status !== "pending") : [];
+        const approved = reviewed.filter((payment) => payment.status === "approved");
+        const rejected = reviewed.filter((payment) => payment.status === "rejected");
+        if (approved.length) {
+          setWalletMessage(`Top-up verified! ${approved.reduce((total, payment) => total + payment.coins, 0).toLocaleString()} coins added to your wallet.`);
+        } else if (rejected.length) {
+          setWalletMessage(`Top-up with UTR ${rejected[0].utr} was rejected${rejected[0].review_note ? `: ${rejected[0].review_note}` : "."}`);
+        }
+      } catch {
+        // Keep showing the last known balance while offline.
+      }
+    };
+    syncWallet();
+    const timer = window.setInterval(syncWallet, 15000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [player, walletSyncTick]);
 
   const requireLogin = () => {
     if (player) return true;
@@ -324,7 +348,7 @@ function App() {
     });
   };
 
-  const confirmMatchJoin = () => {
+  const confirmMatchJoin = async () => {
     if (!joinConfirm || !requireLogin()) {
       return;
     }
@@ -344,16 +368,28 @@ function App() {
       return;
     }
 
-    const nextPurchasedCoins = joinConfirm.isEditing
-      ? purchasedCoins
-      : Math.max(0, purchasedCoins - joinConfirm.cost);
-    const purchasedUsed = joinConfirm.isEditing
-      ? 0
-      : Math.min(purchasedCoins, joinConfirm.cost);
-    const nextWinningCoins = joinConfirm.isEditing
-      ? winningCoins
-      : winningCoins - (joinConfirm.cost - purchasedUsed);
-    const nextCoins = nextPurchasedCoins + nextWinningCoins;
+    if (joinConfirm.submitting) return;
+    setJoinConfirm((previous) => ({ ...previous, submitting: true, error: "" }));
+    let charged;
+    try {
+      const entry = await postJson("/api/matches/entry", {
+        matchId: joinConfirm.matchId,
+        publicId: joinConfirm.publicId,
+        mode: joinConfirm.mode,
+        matchTimestamp: joinConfirm.matchTimestamp,
+        entryFee: joinConfirm.cost,
+        userKey: getUserKey(player),
+        password: player.password,
+      });
+      charged = entry.charged;
+      setPurchasedCoins(entry.wallet.creditCoins);
+      setWinningCoins(entry.wallet.winningCoins);
+      setCoins(entry.wallet.totalCoins);
+    } catch (error) {
+      setJoinConfirm((previous) => previous && { ...previous, submitting: false, error: error.message });
+      return;
+    }
+
     const nextJoinedMatches = joinConfirm.isEditing
       ? joinedMatches.map((entry) =>
           entry.id === joinConfirm.matchId
@@ -367,29 +403,12 @@ function App() {
           identifiers,
           matchTimestamp: joinConfirm.matchTimestamp,
         }];
-
-    setCoins(nextCoins);
-    setPurchasedCoins(nextPurchasedCoins);
-    setWinningCoins(nextWinningCoins);
     setJoinedMatches(nextJoinedMatches);
-    void fetch("/api/matches/entry", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        matchId: joinConfirm.matchId,
-      publicId: joinConfirm.publicId,
-      mode: joinConfirm.mode,
-      matchTimestamp: joinConfirm.matchTimestamp,
-        entryFee: joinConfirm.cost,
-        teamKey: player?.email || player?.phone || player?.name,
-        userKey: player?.email || player?.phone || player?.name,
-      }),
-    }).catch(() => {});
 
     setWalletMessage(
       joinConfirm.isEditing
         ? `${joinConfirm.mode} details updated for ${identifiers.join(", ")}.`
-        : `${joinConfirm.mode} joined successfully for ${identifiers.join(", ")}. ${joinConfirm.cost.toLocaleString()} coins deducted.`,
+        : `${joinConfirm.mode} joined successfully for ${identifiers.join(", ")}. ${charged.toLocaleString()} coins deducted.`,
     );
     setJoinConfirm(null);
   };
@@ -503,6 +522,7 @@ function App() {
       coins: 0,
       status: "active",
     };
+    nextPlayer.userKey = getUserKey(nextPlayer);
     const accountExists = registeredUsers.some(
       (user) =>
         (nextPlayer.email && user.email === nextPlayer.email) ||
@@ -537,7 +557,7 @@ function App() {
     });
 
     // Immediately persist and activate user in backend DB so Admin Desk counts them
-    const newUserKey = nextPlayer.email || nextPlayer.phone || nextPlayer.name;
+    const newUserKey = nextPlayer.userKey;
     void fetch("/api/users/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -585,7 +605,7 @@ function App() {
     if (!/^\S+@\S+\.\S+$/.test(trimmedEmail))
       return "Enter a valid email address.";
 
-    const nextPlayer = { ...player, name: trimmedName, email: trimmedEmail };
+    const nextPlayer = { ...player, userKey: getUserKey(player), name: trimmedName, email: trimmedEmail };
     const nextUsers = registeredUsers.map((user) => (
       user.email === player.email || user.phone === player.phone
         ? nextPlayer
@@ -597,7 +617,7 @@ function App() {
     setRegisteredUsers(nextUsers);
     setPlayer(nextPlayer);
 
-    const updatedUserKey = nextPlayer.email || nextPlayer.phone || nextPlayer.name;
+    const updatedUserKey = nextPlayer.userKey;
     void fetch("/api/users/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -701,23 +721,29 @@ function App() {
     window.location.assign(pendingPayment.upiUrl);
   };
 
-  const submitPaymentProof = ({ utr, screenshotName }) => {
-    if (!requireLogin() || !pendingPayment) return;
-    const requests = JSON.parse(localStorage.getItem("nexus-payment-requests") || "[]");
-    requests.push({ ...pendingPayment, utr, screenshotName, status: "pending", createdAt: new Date().toISOString(), user: player?.email || player?.phone || "guest" });
-    localStorage.setItem("nexus-payment-requests", JSON.stringify(requests));
-    void fetch("/api/payments/request", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userKey: player?.email || player?.phone || player?.name, amount: pendingPayment.amount, coins: pendingPayment.amount, utr }),
-    }).catch(() => {});
+  const submitPaymentProof = async ({ utr }) => {
+    if (!requireLogin() || !pendingPayment) return false;
+    try {
+      const { payment } = await postJson("/api/payments/request", {
+        userKey: getUserKey(player),
+        password: player.password,
+        amount: pendingPayment.amount,
+        utr,
+      });
+      setWalletActivity((current) => ({ ...current, payments: [payment, ...current.payments] }));
+      paymentStatuses.current = { ...(paymentStatuses.current || {}), [payment.id]: payment.status };
+    } catch (error) {
+      setWalletMessage(error.message);
+      return false;
+    }
     localStorage.removeItem("nexus-pending-payment");
     setPendingPayment(null);
     setManualUtr("");
-    setWalletMessage("Payment proof submitted. Coins will be added after verification.");
+    setWalletMessage("Payment proof submitted. Coins will be added as soon as the admin verifies your UTR.");
+    return true;
   };
 
-  const requestWithdrawal = (event) => {
+  const requestWithdrawal = async (event) => {
     event.preventDefault();
     if (!requireLogin()) return;
 
@@ -756,17 +782,24 @@ function App() {
       );
       return;
     }
-    const remainingCoins = coins - amount;
-    const remainingWinningCoins = winningCoins - amount;
-    setCoins(remainingCoins);
-    setWinningCoins(remainingWinningCoins);
-    void fetch("/api/withdrawals/request", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userKey: player?.email || player?.phone || player?.name, amount, method: withdrawMethod, details: { ...withdrawDetails, qrScreenshotName: withdrawalScreenshot.name } }),
-    }).catch(() => {});
+    try {
+      const { wallet } = await postJson("/api/withdrawals/request", {
+        userKey: getUserKey(player),
+        password: player.password,
+        amount,
+        method: withdrawMethod,
+        details: { ...withdrawDetails, qrScreenshotName: withdrawalScreenshot.name },
+      });
+      setPurchasedCoins(wallet.creditCoins);
+      setWinningCoins(wallet.winningCoins);
+      setCoins(wallet.totalCoins);
+      setWalletActivity({ payments: wallet.payments || [], withdrawals: wallet.withdrawals || [] });
+    } catch (error) {
+      setWalletMessage(error.message);
+      return;
+    }
     setWalletMessage(
-      `Withdrawal request for ${amount.toLocaleString()} coins submitted.`,
+      `Withdrawal request for ${amount.toLocaleString()} coins submitted. It is held until the admin pays it out.`,
     );
     setWithdrawAmount("");
     setWithdrawalScreenshot(null);
@@ -799,6 +832,7 @@ function App() {
           window.history.pushState({ view: "wallet" }, "", "#wallet");
           setWalletOpen(true);
           setWalletMessage("");
+          setWalletSyncTick((tick) => tick + 1);
         }}
         onAdmin={() => {
           window.history.pushState({ view: "admin" }, "", "#admin");
@@ -873,6 +907,7 @@ function App() {
           setManualUtr={setManualUtr}
           pendingPayment={pendingPayment}
           onSubmitPaymentProof={submitPaymentProof}
+          paymentHistory={player ? walletActivity.payments : []}
           withdrawAmount={withdrawAmount}
           setWithdrawAmount={setWithdrawAmount}
           withdrawMethod={withdrawMethod}
@@ -1051,8 +1086,8 @@ function App() {
               <button type="button" className="join-confirm-secondary" onClick={() => setJoinConfirm(null)}>
                 Cancel
               </button>
-              <button type="button" className="join-confirm-primary" onClick={confirmMatchJoin}>
-                OK
+              <button type="button" className="join-confirm-primary" onClick={confirmMatchJoin} disabled={joinConfirm.submitting}>
+                {joinConfirm.submitting ? "Joining..." : "OK"}
               </button>
             </div>
           </div>

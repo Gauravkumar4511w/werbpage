@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 
-function WalletModal({ coins, creditCoins, winningCoins, withdrawableCoins, walletTab, setWalletTab, onClose, buyAmount, setBuyAmount, onUpiBuy, onOpenUpiPayment, manualUtr, setManualUtr, pendingPayment, onSubmitPaymentProof, withdrawAmount, setWithdrawAmount, withdrawMethod, setWithdrawMethod, withdrawDetails, setWithdrawDetails, setWithdrawalScreenshot, requestWithdrawal, walletMessage }) {
+function WalletModal({ coins, creditCoins, winningCoins, withdrawableCoins, walletTab, setWalletTab, onClose, buyAmount, setBuyAmount, onUpiBuy, onOpenUpiPayment, manualUtr, setManualUtr, pendingPayment, onSubmitPaymentProof, paymentHistory = [], withdrawAmount, setWithdrawAmount, withdrawMethod, setWithdrawMethod, withdrawDetails, setWithdrawDetails, setWithdrawalScreenshot, requestWithdrawal, walletMessage }) {
   const updateDetails = (field, value) => setWithdrawDetails({ ...withdrawDetails, [field]: value })
   const paymentExpiresAt = pendingPayment?.expiresAt || (pendingPayment?.createdAt ? new Date(pendingPayment.createdAt).getTime() + 5 * 60 * 1000 : 0)
   const [screenshot, setScreenshot] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
   const [secondsLeft, setSecondsLeft] = useState(() => Math.max(0, Math.ceil((paymentExpiresAt - Date.now()) / 1000)))
 
   useEffect(() => {
@@ -15,11 +16,13 @@ function WalletModal({ coins, creditCoins, winningCoins, withdrawableCoins, wall
     return () => window.clearInterval(timer)
   }, [paymentExpiresAt])
 
-  const submitProof = (event) => {
+  const submitProof = async (event) => {
     event.preventDefault()
-    if (secondsLeft <= 0 || manualUtr.trim().length < 6 || !screenshot) return
-    onSubmitPaymentProof({ utr: manualUtr.trim(), screenshotName: screenshot.name })
-    setScreenshot(null)
+    if (submitting || secondsLeft <= 0 || manualUtr.trim().length < 6 || !screenshot) return
+    setSubmitting(true)
+    const submitted = await onSubmitPaymentProof({ utr: manualUtr.trim(), screenshotName: screenshot.name })
+    setSubmitting(false)
+    if (submitted) setScreenshot(null)
   }
 
   return (
@@ -50,7 +53,7 @@ function WalletModal({ coins, creditCoins, winningCoins, withdrawableCoins, wall
                 <p>After paying, upload your screenshot and enter the UTR.</p>
                 <label>Payment screenshot<input type="file" accept="image/*" onChange={(event) => setScreenshot(event.target.files?.[0] || null)} required /></label>
                 <label>UTR / transaction ID<input value={manualUtr} onChange={(event) => setManualUtr(event.target.value)} placeholder="Enter payment UTR" required /></label>
-                <button className="auth-submit" type="submit" disabled={secondsLeft <= 0}>Submit payment proof <span>-&gt;</span></button>
+                <button className="auth-submit" type="submit" disabled={secondsLeft <= 0 || submitting}>{submitting ? 'Submitting...' : <>Submit payment proof <span>-&gt;</span></>}</button>
               </form>
             </>}
             <form className="coin-custom-form" onSubmit={(event) => { event.preventDefault(); onUpiBuy(Number(buyAmount)) }}>
@@ -58,6 +61,19 @@ function WalletModal({ coins, creditCoins, winningCoins, withdrawableCoins, wall
               <button className="auth-submit" type="submit">Show payment QR <span>-&gt;</span></button>
             </form>
             <div className="coin-packages">{[[500, 'Starter'], [1200, 'Player'], [2500, 'Elite']].map(([amount, label]) => <button type="button" key={amount} onClick={() => onUpiBuy(amount)}><strong>{amount.toLocaleString()}</strong><span>{label} pack</span><small>Pay with UPI</small></button>)}</div>
+            {paymentHistory.length > 0 && (
+              <div className="wallet-history">
+                <h3>Your top-ups</h3>
+                {paymentHistory.slice(0, 5).map((payment) => (
+                  <div className="wallet-history-row" key={payment.id}>
+                    <strong>{payment.coins.toLocaleString()} coins</strong>
+                    <em className={`is-${payment.status}`}>{payment.status === 'pending' ? 'verifying' : payment.status}</em>
+                    <small>UTR {payment.utr}</small>
+                    {payment.status === 'rejected' && payment.review_note && <p>{payment.review_note}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
           </>
         ) : (
           <form className="withdraw-form" onSubmit={requestWithdrawal}>
