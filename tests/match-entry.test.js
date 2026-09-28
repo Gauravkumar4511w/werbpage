@@ -155,3 +155,35 @@ test('the default prize pool counts the teams that actually joined', async () =>
   assert.equal(result.data.payout.totalPool, 300)
   assert.equal(result.data.payout.payoutPool, 240)
 })
+
+test('players can change their gamer tag, email and mobile number and log in with the new ones', async () => {
+  const saved = await request('/api/users/profile', { body: { ...players[1], displayName: 'RenamedTwo', email: 'two@gmail.com', phone: '+91 98888 77777' } })
+  assert.equal(saved.status, 200, JSON.stringify(saved.data))
+  assert.deepEqual(saved.data.user, { userKey: players[1].userKey, name: 'RenamedTwo', email: 'two@gmail.com', phone: '+91 98888 77777' })
+
+  for (const login of ['two@gmail.com', '9888877777']) {
+    const result = await request('/api/users/login', { body: { login, password: players[1].password } })
+    assert.equal(result.data.user.userKey, players[1].userKey)
+  }
+  const wallet = await request('/api/users/wallet', { body: players[1] })
+  assert.equal(wallet.data.profile.name, 'RenamedTwo')
+
+  // A browser with an old copy of the account must not undo the edit.
+  await request('/api/users/sync', { body: { users: [{ userKey: players[1].userKey, name: 'Player2', phone: players[1].userKey, password: players[1].password }] } })
+  const afterSync = await request('/api/users/wallet', { body: players[1] })
+  assert.equal(afterSync.data.profile.name, 'RenamedTwo')
+  assert.equal(afterSync.data.profile.email, 'two@gmail.com')
+})
+
+test('profile edits need the password, stay unique and keep a way to log in', async () => {
+  const change = (player, body) => request('/api/users/profile', { body: { ...player, displayName: 'Player1', email: '', phone: player.userKey, ...body } })
+  assert.equal((await change({ ...players[0], password: 'wrong' }, {})).status, 403)
+  assert.equal((await change(players[0], { displayName: 'renamedtwo' })).status, 409)
+  assert.equal((await change(players[0], { email: 'TWO@gmail.com' })).status, 409)
+  assert.equal((await change(players[0], { phone: '09888877777' })).status, 409)
+  assert.equal((await change(players[0], { email: '', phone: '' })).status, 400)
+  assert.equal((await change(players[0], { phone: '12' })).status, 400)
+
+  const signup = await request('/api/users/register', { body: { userKey: 'two@gmail.com', email: 'two@gmail.com', password: 'someone-else' } })
+  assert.equal(signup.status, 409)
+})

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import freeFireMaxIcon from "./assets/image_10d29343.jpg";
 import "./App.css";
 import AuthModal from "./components/AuthModal";
@@ -290,8 +290,15 @@ function App() {
     if (Array.isArray(wallet.entries)) {
       setJoinedMatches((previous) => joinedMatchesFromServer(wallet.entries, previous));
     }
+    // A profile edited on another device shows up here too.
+    const profile = wallet.profile;
+    if (player && profile?.name && (profile.email || profile.phone)
+      && (profile.name !== player.name || profile.email !== (player.email || "") || profile.phone !== (player.phone || ""))) {
+      storeProfile(profile);
+    }
     userDataReady.current = true;
   };
+  const onWalletLoaded = useEffectEvent(applyWallet);
 
   // The server wallet is the source of truth: admin approvals, adjustments, and winnings all land there.
   useEffect(() => {
@@ -304,7 +311,7 @@ function App() {
       try {
         const wallet = await postJson("/api/users/wallet", { userKey: getUserKey(player), password: player.password });
         if (!active) return;
-        applyWallet(wallet);
+        onWalletLoaded(wallet);
 
         const previous = paymentStatuses.current;
         paymentStatuses.current = Object.fromEntries((wallet.payments || []).map((payment) => [payment.id, payment.status]));
@@ -637,38 +644,49 @@ function App() {
     setAuthOpen(false);
   };
 
-  const handleUpdateProfile = (name, email) => {
-    const trimmedName = name.trim();
-    const trimmedEmail = email.trim();
-
-    if (trimmedName.length < 3)
-      return "Choose a gamer tag with at least 3 characters.";
-    if (trimmedEmail && !/^\S+@\S+\.\S+$/.test(trimmedEmail))
-      return "Enter a valid email address.";
-
-    const nextPlayer = { ...player, userKey: getUserKey(player), name: trimmedName, email: trimmedEmail };
-    const nextUsers = registeredUsers.map((user) => (
-      getUserKey(user) === nextPlayer.userKey ? nextPlayer : user
-    ));
-    saveUserData(nextPlayer, { purchasedCoins, winningCoins, coins, joinedMatches });
+  // Saves the edited profile locally for this device (login list and gamer tags) once the server accepts it.
+  const storeProfile = (profile) => {
+    const userKey = getUserKey(player);
+    const nextPlayer = { ...player, userKey, name: profile.name, email: profile.email || "", phone: profile.phone || "" };
+    const nextUsers = registeredUsers.some((user) => getUserKey(user) === userKey)
+      ? registeredUsers.map((user) => (getUserKey(user) === userKey ? nextPlayer : user))
+      : [...registeredUsers, nextPlayer];
+    const nextNames = [...registeredNames.filter((name) => name.toLowerCase() !== player.name.toLowerCase()), nextPlayer.name];
     localStorage.setItem("nexus-player", JSON.stringify(nextPlayer));
     localStorage.setItem("nexus-registered-users", JSON.stringify(nextUsers));
+    localStorage.setItem("nexus-registered-names", JSON.stringify(nextNames));
     setRegisteredUsers(nextUsers);
+    setRegisteredNames(nextNames);
     setPlayer(nextPlayer);
+  };
 
-    const updatedUserKey = nextPlayer.userKey;
-    void fetch("/api/users/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userKey: updatedUserKey,
-        displayName: nextPlayer.name,
-        email: nextPlayer.email,
-        phone: nextPlayer.phone,
-        password: nextPlayer.password,
-      }),
-    }).catch(() => {});
+  const handleUpdateProfile = async ({ name, email, phone }) => {
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim().toLowerCase();
+    const trimmedPhone = phone.trim();
 
+    if (trimmedName.length < 3 || trimmedName.length > 24)
+      return "Choose a gamer tag with 3 to 24 characters.";
+    if (trimmedEmail && !/^\S+@\S+\.\S+$/.test(trimmedEmail))
+      return "Enter a valid email address.";
+    if (trimmedPhone && !/^\+?[0-9\s-]{10,15}$/.test(trimmedPhone))
+      return "Enter a valid mobile number.";
+    if (!trimmedEmail && !trimmedPhone)
+      return "Keep an email or a mobile number so you can log in.";
+
+    try {
+      const { user } = await postJson("/api/users/profile", {
+        userKey: getUserKey(player),
+        password: player.password,
+        displayName: trimmedName,
+        email: trimmedEmail,
+        phone: trimmedPhone,
+      });
+      storeProfile(user);
+    } catch (error) {
+      return error.message;
+    }
+    showNotice("Profile saved. You can log in with your new email or mobile number.", "success");
     return "";
   };
 

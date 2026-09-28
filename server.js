@@ -24,6 +24,7 @@ import {
   getLiveStats,
   loginUser,
   registerOrUpdateUser,
+  updateUserProfile,
   syncUsers,
   adminSetUserStatus,
   getAdminNotifications,
@@ -251,6 +252,15 @@ async function handleApiRequest(request, response) {
       sendJson(response, 200, { user })
     } catch (error) {
       sendError(response, error, 'Could not log in.')
+    }
+    return
+  }
+
+  if (request.method === 'POST' && pathname === '/api/users/profile') {
+    try {
+      sendJson(response, 200, { user: updateUserProfile(await readBody(request)) })
+    } catch (error) {
+      sendError(response, error, 'Could not save your profile.')
     }
     return
   }

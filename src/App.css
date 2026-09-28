@@ -959,3 +959,4 @@ body { background: #07111c; }
 .app-notice.is-error { border-color: rgba(233,135,120,.75); }
 .match-details-modal .match-detail-header { padding-right: 40px; }
 .join-confirm-close { z-index: 2; }
+.profile-form-hint { display: block; margin: -4px 0 4px; color: #8895a1; font-size: 11px; line-height: 1.4; }

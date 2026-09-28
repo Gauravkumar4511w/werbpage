@@ -1,17 +1,30 @@
 import { useState } from 'react'
 
 function AuthModal({ authOpen, setAuthOpen, authMode, setAuthMode, showPassword, setShowPassword, authError, setAuthError, form, setForm, handleAuthSubmit, player, profileStats, handleSignOut, onUpdateProfile }) {
-  const [profileForm, setProfileForm] = useState({ name: null, email: null })
+  const emptyProfileForm = { name: null, email: null, phone: null }
+  const [profileForm, setProfileForm] = useState(emptyProfileForm)
   const [profileError, setProfileError] = useState('')
+  const [profileSaving, setProfileSaving] = useState(false)
 
   if (!authOpen) return null
 
   if (player) {
-    const handleProfileSubmit = (event) => {
+    // Untouched fields are null, so fall back to the saved value for each one.
+    const handleProfileSubmit = async (event) => {
       event.preventDefault()
-      const error = onUpdateProfile(profileForm.name, profileForm.email)
+      if (profileSaving) return
+      setProfileSaving(true)
+      const error = await onUpdateProfile({
+        name: profileForm.name ?? player.name,
+        email: profileForm.email ?? player.email ?? '',
+        phone: profileForm.phone ?? player.phone ?? '',
+      })
+      setProfileSaving(false)
       setProfileError(error)
-      if (!error) setAuthOpen(false)
+      if (!error) {
+        setProfileForm(emptyProfileForm)
+        setAuthOpen(false)
+      }
     }
 
     return (
@@ -24,12 +37,14 @@ function AuthModal({ authOpen, setAuthOpen, authMode, setAuthMode, showPassword,
           <div className="profile-contact"><span className="profile-section-label">ACCOUNT DETAILS</span><div><span>EMAIL</span><strong>{player.email || 'Mobile account'}</strong></div><div><span>MOBILE</span><strong>{player.phone || 'Not added'}</strong></div></div>
           <div className="profile-edit-heading"><span className="profile-section-label">EDIT PROFILE</span><small>Keep your player details current.</small></div>
           <form className="profile-form" onSubmit={handleProfileSubmit}>
-            <label>Gamer tag<input value={profileForm.name ?? player.name} onChange={(event) => setProfileForm({ ...profileForm, name: event.target.value })} autoComplete="username" /></label>
-            <label>Email address<input type="email" value={profileForm.email ?? player.email ?? ''} onChange={(event) => setProfileForm({ ...profileForm, email: event.target.value })} placeholder="Optional for mobile accounts" autoComplete="email" /></label>
+            <label>Gamer tag<input value={profileForm.name ?? player.name} onChange={(event) => setProfileForm({ ...profileForm, name: event.target.value })} maxLength={24} autoComplete="username" /></label>
+            <label>Gmail / Email address<input type="email" value={profileForm.email ?? player.email ?? ''} onChange={(event) => setProfileForm({ ...profileForm, email: event.target.value })} placeholder="you@gmail.com" autoComplete="email" /></label>
+            <label>Mobile number<input type="tel" value={profileForm.phone ?? player.phone ?? ''} onChange={(event) => setProfileForm({ ...profileForm, phone: event.target.value })} placeholder="+91 98765 43210" autoComplete="tel" /></label>
+            <small className="profile-form-hint">Keep at least one: you log in with your email or mobile number.</small>
             {profileError && <p className="auth-error" role="alert">{profileError}</p>}
-            <button className="auth-submit" type="submit">Save profile <span>-&gt;</span></button>
+            <button className="auth-submit" type="submit" disabled={profileSaving}>{profileSaving ? 'Saving...' : <>Save profile <span>-&gt;</span></>}</button>
           </form>
-          <button className="sign-out" type="button" onClick={handleSignOut}>Sign out of {player.name}</button>
+          <button className="sign-out" type="button" onClick={() => { setProfileForm(emptyProfileForm); setProfileError(''); handleSignOut() }}>Sign out of {player.name}</button>
         </section>
       </div>
     )
