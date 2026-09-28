@@ -20,6 +20,11 @@ import {
   registerMatchCatalog,
   updateMatchDetails,
   verifyAdminSession,
+  recordUserPresence,
+  getLiveStats,
+  registerOrUpdateUser,
+  syncUsers,
+  adminSetUserStatus,
 } from './lib/payout-db.js'
 
 try { process.loadEnvFile?.() } catch { /* Deployed environments may not have a local .env file. */ }
@@ -190,6 +195,79 @@ async function handleApiRequest(request, response) {
   if (request.method === 'GET' && pathname === '/api/admin/overview') {
     if (!requireAdmin(request, response)) return
     sendJson(response, 200, getAdminOverview())
+    return
+  }
+
+  if (request.method === 'GET' && (pathname === '/api/presence/stats' || pathname === '/api/presence/live-count')) {
+    sendJson(response, 200, getLiveStats())
+    return
+  }
+
+  if (request.method === 'POST' && pathname === '/api/presence/heartbeat') {
+    try {
+      const body = await readBody(request)
+      const stats = recordUserPresence({
+        sessionId: body.sessionId,
+        userKey: body.userKey,
+        ip: request.headers?.['x-forwarded-for'] || request.socket?.remoteAddress || '',
+      })
+      sendJson(response, 200, { success: true, ...stats })
+    } catch (error) {
+      sendJson(response, 400, { message: error instanceof Error ? error.message : 'Could not record heartbeat.' })
+    }
+    return
+  }
+
+  if (request.method === 'POST' && pathname === '/api/users/register') {
+    try {
+      const body = await readBody(request)
+      const user = registerOrUpdateUser(body)
+      if (body.sessionId) {
+        recordUserPresence({ sessionId: body.sessionId, userKey: user.user_key })
+      }
+      sendJson(response, 200, { success: true, user })
+    } catch (error) {
+      sendJson(response, 400, { message: error instanceof Error ? error.message : 'Could not register user.' })
+    }
+    return
+  }
+
+  if (request.method === 'POST' && pathname === '/api/users/sync') {
+    try {
+      const body = await readBody(request)
+      const users = syncUsers(body.users)
+      sendJson(response, 200, { success: true, count: users.length })
+    } catch (error) {
+      sendJson(response, 400, { message: error instanceof Error ? error.message : 'Could not sync users.' })
+    }
+    return
+  }
+
+  if (request.method === 'POST' && pathname === '/api/admin/users/create') {
+    if (!requireAdmin(request, response)) return
+    try {
+      const body = await readBody(request)
+      const user = registerOrUpdateUser({
+        ...body,
+        creditCoins: body.creditCoins || 0,
+        status: 'active',
+      })
+      sendJson(response, 201, { success: true, user })
+    } catch (error) {
+      sendJson(response, 400, { message: error instanceof Error ? error.message : 'Could not create user.' })
+    }
+    return
+  }
+
+  if (request.method === 'PATCH' && pathname === '/api/admin/users/status') {
+    if (!requireAdmin(request, response)) return
+    try {
+      const body = await readBody(request)
+      const user = adminSetUserStatus(body)
+      sendJson(response, 200, { success: true, user })
+    } catch (error) {
+      sendJson(response, 400, { message: error instanceof Error ? error.message : 'Could not update user status.' })
+    }
     return
   }
 

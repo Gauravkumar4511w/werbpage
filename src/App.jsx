@@ -147,6 +147,54 @@ function App() {
       return [];
     }
   });
+  const [liveCount, setLiveCount] = useState(() => Math.max(1, registeredUsers.length));
+
+  useEffect(() => {
+    let active = true;
+    let sessionId = "";
+    try {
+      sessionId = sessionStorage.getItem("nexus-session-id") || "";
+      if (!sessionId) {
+        sessionId = "sess-" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+        sessionStorage.setItem("nexus-session-id", sessionId);
+      }
+    } catch {
+      sessionId = "sess-" + Date.now();
+    }
+
+    if (registeredUsers.length > 0) {
+      fetch("/api/users/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ users: registeredUsers }),
+      }).catch(() => {});
+    }
+
+    const sendHeartbeat = async () => {
+      try {
+        const userKey = player ? getUserKey(player) : "";
+        const res = await fetch("/api/presence/heartbeat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId, userKey }),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (active && data.liveCount) {
+          setLiveCount(data.liveCount);
+        }
+      } catch {
+        // Fallback
+      }
+    };
+
+    sendHeartbeat();
+    const heartbeatTimer = window.setInterval(sendHeartbeat, 6000);
+    return () => {
+      active = false;
+      window.clearInterval(heartbeatTimer);
+    };
+  }, [player, registeredUsers]);
 
   useEffect(() => {
     const clock = window.setInterval(() => setCurrentTime(Date.now()), 10000);
@@ -429,6 +477,21 @@ function App() {
         signupMethod: "phone",
         loginMethod: "email",
       });
+
+      // Update presence on login
+      void fetch("/api/presence/heartbeat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: sessionStorage.getItem("nexus-session-id") || undefined,
+          userKey: getUserKey(account),
+        }),
+      }).then(async (res) => {
+        if (res.ok) {
+          const data = await res.json();
+          if (data.liveCount) setLiveCount(data.liveCount);
+        }
+      }).catch(() => {});
       return;
     }
 
@@ -438,6 +501,7 @@ function App() {
       phone: signupMethod === "phone" ? phone.trim() : "",
       password,
       coins: 0,
+      status: "active",
     };
     const accountExists = registeredUsers.some(
       (user) =>
@@ -471,6 +535,28 @@ function App() {
       signupMethod: "phone",
       loginMethod: "email",
     });
+
+    // Immediately persist and activate user in backend DB so Admin Desk counts them
+    const newUserKey = nextPlayer.email || nextPlayer.phone || nextPlayer.name;
+    void fetch("/api/users/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userKey: newUserKey,
+        displayName: nextPlayer.name,
+        email: nextPlayer.email,
+        phone: nextPlayer.phone,
+        password: nextPlayer.password,
+        status: "active",
+        sessionId: sessionStorage.getItem("nexus-session-id") || undefined,
+      }),
+    }).then(async (res) => {
+      if (res.ok) {
+        fetch("/api/presence/stats").then(r => r.json()).then(stats => {
+          if (stats?.liveCount) setLiveCount(stats.liveCount);
+        }).catch(() => {});
+      }
+    }).catch(() => {});
   };
 
   const handleSignOut = () => {
@@ -510,6 +596,20 @@ function App() {
     localStorage.setItem("nexus-registered-users", JSON.stringify(nextUsers));
     setRegisteredUsers(nextUsers);
     setPlayer(nextPlayer);
+
+    const updatedUserKey = nextPlayer.email || nextPlayer.phone || nextPlayer.name;
+    void fetch("/api/users/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userKey: updatedUserKey,
+        displayName: nextPlayer.name,
+        email: nextPlayer.email,
+        phone: nextPlayer.phone,
+        status: "active",
+      }),
+    }).catch(() => {});
+
     return "";
   };
 
@@ -736,7 +836,7 @@ function App() {
           }}
         />
       ) : (
-        <HeroSection openTournaments={openTournaments} registeredAccountCount={registeredUsers.length} />
+        <HeroSection openTournaments={openTournaments} liveCount={liveCount} />
       )}
       <AuthModal
         authOpen={authOpen}

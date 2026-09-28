@@ -14,6 +14,7 @@ function AdminPanel({ onBack }) {
   const [query, setQuery] = useState('')
   const [message, setMessage] = useState('')
   const [creditForm, setCreditForm] = useState({ userKey: '', amount: '', displayName: '' })
+  const [userForm, setUserForm] = useState({ userKey: '', displayName: '', creditCoins: '' })
   const [killForm, setKillForm] = useState({ matchId: '', userKey: '', kills: '' })
   const [resultForm, setResultForm] = useState({ matchId: '', winnerTeamKey: '' })
   const [matchLookup, setMatchLookup] = useState('')
@@ -104,6 +105,23 @@ function AdminPanel({ onBack }) {
       await api('/api/admin/users/credit', { method: 'POST', body: JSON.stringify({ ...creditForm, amount: Number(creditForm.amount) }) })
       setCreditForm({ userKey: '', amount: '', displayName: '' })
       setMessage('Credit balance updated.')
+      await loadOverview()
+    } catch (error) { setMessage(error.message) }
+  }
+
+  const submitCreateUser = async (event) => {
+    event.preventDefault()
+    try {
+      const data = await api('/api/admin/users/create', {
+        method: 'POST',
+        body: JSON.stringify({
+          userKey: userForm.userKey.trim(),
+          displayName: userForm.displayName.trim(),
+          creditCoins: Number(userForm.creditCoins) || 0,
+        }),
+      })
+      setUserForm({ userKey: '', displayName: '', creditCoins: '' })
+      setMessage(`Active user ${data.user?.display_name || data.user?.user_key || userForm.userKey} added and counted.`)
       await loadOverview()
     } catch (error) { setMessage(error.message) }
   }
@@ -246,6 +264,11 @@ function AdminPanel({ onBack }) {
   const searchable = (value) => JSON.stringify(value).toLowerCase().includes(query.toLowerCase())
   const logout = () => { sessionStorage.removeItem('arenacore-admin-token'); setToken('') }
   const filteredUsers = overview.users.filter(searchable)
+  const usersDisplayRows = filteredUsers.map((item) => ({
+    ...item,
+    status: item.status || 'active',
+    online: item.is_online ? 'Online' : 'Offline',
+  }))
   const filteredPayments = overview.payments.filter(searchable)
   const filteredWithdrawals = overview.withdrawals.filter(searchable)
   const filteredMatches = overview.matches.filter(searchable)
@@ -253,9 +276,9 @@ function AdminPanel({ onBack }) {
     ? overview.matches.find((match) => match.match_id === selectedMatch.match_id) || selectedMatch
     : null
 
-  return <main className="admin-page"><header className="admin-header"><div><p className="eyebrow"><span /> Secure control room</p><h1>ADMIN DESK.</h1></div><div className="admin-header-actions"><button type="button" onClick={loadOverview}>Refresh</button><button type="button" onClick={logout}>Sign out</button><button type="button" onClick={onBack}>Exit</button></div></header><div className="admin-summary"><div><span>Users</span><strong>{overview.users.length}</strong></div><div><span>Payments</span><strong>{overview.payments.filter((item) => item.status === 'pending').length}</strong><small>pending review</small></div><div><span>Withdrawals</span><strong>{overview.withdrawals.filter((item) => item.status === 'pending').length}</strong><small>pending review</small></div><div><span>Matches</span><strong>{overview.matches.length}</strong></div></div><div className="admin-toolbar"><nav>{['overview', 'payments', 'withdrawals', 'matches', 'users'].map((item) => <button key={item} className={tab === item ? 'selected' : ''} type="button" onClick={() => setTab(item)}>{item}</button>)}</nav><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search user, match, UTR..." /></div>{message && <p className="admin-message">{message}</p>}
+  return <main className="admin-page"><header className="admin-header"><div><p className="eyebrow"><span /> Secure control room</p><h1>ADMIN DESK.</h1></div><div className="admin-header-actions"><button type="button" onClick={loadOverview}>Refresh</button><button type="button" onClick={logout}>Sign out</button><button type="button" onClick={onBack}>Exit</button></div></header><div className="admin-summary"><div><span>Total Users</span><strong>{overview.users.length}</strong></div><div><span>Active Users</span><strong>{overview.activeUsersCount ?? overview.users.filter((item) => item.status !== 'inactive').length}</strong><small>{overview.onlineUsersCount ?? overview.users.filter((item) => item.is_online).length} online now</small></div><div><span>Live Players</span><strong>{overview.liveCount ?? Math.max(overview.users.length, 1)}</strong><small>real-time active</small></div><div><span>Payments</span><strong>{overview.payments.filter((item) => item.status === 'pending').length}</strong><small>pending review</small></div><div><span>Withdrawals</span><strong>{overview.withdrawals.filter((item) => item.status === 'pending').length}</strong><small>pending review</small></div><div><span>Matches</span><strong>{overview.matches.length}</strong></div></div><div className="admin-toolbar"><nav>{['overview', 'payments', 'withdrawals', 'matches', 'users'].map((item) => <button key={item} className={tab === item ? 'selected' : ''} type="button" onClick={() => setTab(item)}>{item}</button>)}</nav><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search user, match, UTR..." /></div>{message && <p className="admin-message">{message}</p>}
 
-    {tab === 'overview' && <div className="admin-grid"><section className="admin-card"><h2>Add credit coins</h2><p>Use this for verified manual adjustments only.</p><form onSubmit={submitCredit}><input placeholder="User email / phone" value={creditForm.userKey} onChange={(event) => setCreditForm({ ...creditForm, userKey: event.target.value })} required /><input placeholder="Display name" value={creditForm.displayName} onChange={(event) => setCreditForm({ ...creditForm, displayName: event.target.value })} /><input type="number" placeholder="+ coins or - coins" value={creditForm.amount} onChange={(event) => setCreditForm({ ...creditForm, amount: event.target.value })} required /><button type="submit">Save credit balance</button></form></section><section className="admin-card"><h2>Record kills</h2><p>Save the final kill count before confirming a result.</p><form onSubmit={submitKills}><input placeholder="Match ID" value={killForm.matchId} onChange={(event) => setKillForm({ ...killForm, matchId: event.target.value })} required /><input placeholder="User email / phone" value={killForm.userKey} onChange={(event) => setKillForm({ ...killForm, userKey: event.target.value })} required /><input type="number" min="0" placeholder="Kills" value={killForm.kills} onChange={(event) => setKillForm({ ...killForm, kills: event.target.value })} required /><button type="submit">Save kills</button></form></section><section className="admin-card"><h2>Confirm winner</h2><p>Once confirmed, the 80% winnings payout cannot be duplicated.</p><form onSubmit={submitResult}><input placeholder="Match ID" value={resultForm.matchId} onChange={(event) => setResultForm({ ...resultForm, matchId: event.target.value })} required /><input placeholder="Winning team key" value={resultForm.winnerTeamKey} onChange={(event) => setResultForm({ ...resultForm, winnerTeamKey: event.target.value })} required /><button type="submit">Confirm result and payout</button></form></section></div>}
+    {tab === 'overview' && <div className="admin-grid"><section className="admin-card"><h2>Add active user</h2><p>Register a new active player directly into the database.</p><form onSubmit={submitCreateUser}><input placeholder="User email / phone" value={userForm.userKey} onChange={(event) => setUserForm({ ...userForm, userKey: event.target.value })} required /><input placeholder="Display name / Gamer tag" value={userForm.displayName} onChange={(event) => setUserForm({ ...userForm, displayName: event.target.value })} required /><input type="number" min="0" placeholder="Initial credit coins (optional)" value={userForm.creditCoins} onChange={(event) => setUserForm({ ...userForm, creditCoins: event.target.value })} /><button type="submit">Add active user</button></form></section><section className="admin-card"><h2>Add credit coins</h2><p>Use this for verified manual adjustments only.</p><form onSubmit={submitCredit}><input placeholder="User email / phone" value={creditForm.userKey} onChange={(event) => setCreditForm({ ...creditForm, userKey: event.target.value })} required /><input placeholder="Display name" value={creditForm.displayName} onChange={(event) => setCreditForm({ ...creditForm, displayName: event.target.value })} /><input type="number" placeholder="+ coins or - coins" value={creditForm.amount} onChange={(event) => setCreditForm({ ...creditForm, amount: event.target.value })} required /><button type="submit">Save credit balance</button></form></section><section className="admin-card"><h2>Record kills</h2><p>Save the final kill count before confirming a result.</p><form onSubmit={submitKills}><input placeholder="Match ID" value={killForm.matchId} onChange={(event) => setKillForm({ ...killForm, matchId: event.target.value })} required /><input placeholder="User email / phone" value={killForm.userKey} onChange={(event) => setKillForm({ ...killForm, userKey: event.target.value })} required /><input type="number" min="0" placeholder="Kills" value={killForm.kills} onChange={(event) => setKillForm({ ...killForm, kills: event.target.value })} required /><button type="submit">Save kills</button></form></section><section className="admin-card"><h2>Confirm winner</h2><p>Once confirmed, the 80% winnings payout cannot be duplicated.</p><form onSubmit={submitResult}><input placeholder="Match ID" value={resultForm.matchId} onChange={(event) => setResultForm({ ...resultForm, matchId: event.target.value })} required /><input placeholder="Winning team key" value={resultForm.winnerTeamKey} onChange={(event) => setResultForm({ ...resultForm, winnerTeamKey: event.target.value })} required /><button type="submit">Confirm result and payout</button></form></section></div>}
     {tab === 'payments' && <DataTable title="Payment requests" columns={['user_key', 'amount', 'coins', 'utr', 'status', 'created_at']} rows={filteredPayments} />}
     {tab === 'withdrawals' && <DataTable title="Withdrawal requests" columns={['user_key', 'amount', 'method', 'details', 'status', 'created_at']} rows={filteredWithdrawals} />}
     {tab === 'matches' && <>
@@ -264,7 +287,7 @@ function AdminPanel({ onBack }) {
       {currentSelectedMatch && <MatchControl match={currentSelectedMatch} entries={overview.entries.filter((entry) => entry.match_id === currentSelectedMatch.match_id)} kills={overview.kills.filter((item) => item.match_id === currentSelectedMatch.match_id)} form={matchForm} setForm={setMatchForm} onSubmit={submitMatchUpdate} onDelete={deleteSelectedMatch} />}
       <DataTable title="Registered matches" columns={['public_id', 'mode', 'entry_fee', 'team_count', 'match_timestamp', 'prize_pool', 'status', 'winner_team_key']} rows={filteredMatches} onRowClick={(row) => selectMatch(row.public_id || row.match_id)} />
     </>}
-    {tab === 'users' && <DataTable title="User balances" columns={['user_key', 'display_name', 'credit_coins', 'winning_coins', 'created_at']} rows={filteredUsers} />}
+    {tab === 'users' && <DataTable title="User balances" columns={['user_key', 'display_name', 'status', 'online', 'credit_coins', 'winning_coins', 'created_at']} rows={usersDisplayRows} />}
   </main>
 }
 
