@@ -133,6 +133,9 @@
 .google-signin { display: flex; justify-content: center; min-height: 44px; }
 .forgot-link { justify-self: end; margin-top: -8px; padding: 0; border: 0; color: #ff927d; background: transparent; font-size: 11px; font-weight: 700; cursor: pointer; }
 .forgot-link:hover { text-decoration: underline; }
+.auth-legal { margin: 18px 0 0; color: #67656d; font-size: 10px; line-height: 1.5; text-align: center; }
+.auth-legal a { color: #85828a; }
+.auth-legal a:hover { color: #ff927d; }
 .otp-panel { display: grid; gap: 12px; padding: 14px; border: 1px solid rgba(255,118,91,.32); background: rgba(255,118,91,.05); animation: modal-in .22s ease-out; }
 .otp-sent { margin: 0; color: #bab6b9; font-size: 12px; line-height: 1.5; }
 .otp-sent strong { color: #f5f1eb; }
