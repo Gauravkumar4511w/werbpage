@@ -11,6 +11,14 @@ import WalletModal from "./components/WalletModal";
 import { EDIT_LOCK_MS, getTeamSize } from "../lib/match-schedule.js";
 
 const userDataStorageKey = "nexus-user-data";
+const emptyAuthForm = { username: "", email: "", phone: "", password: "", otp: "", loginMethod: "email" };
+const emailPattern = /^\S+@\S+\.\S+$/;
+
+// Every way of signing in stores the account the same way. The password (or, after Google sign-in,
+// the login secret the server handed out) authorises this device's wallet and match requests.
+function toAccount({ userKey, name, email, phone }, password) {
+  return { name, email: email || "", phone: phone || "", password, userKey, coins: 0, status: "active" };
+}
 
 function readPendingPayment() {
   try {
@@ -176,17 +184,9 @@ function App() {
     wins: matchHistory.filter((match) => match.result === "Victory").length,
     tournaments: joinedMatches.length,
   };
-  const [form, setForm] = useState({
-    username: "",
-    email: "",
-    phone: "",
-    password: "",
-    otp: "",
-    signupMethod: "phone",
-    loginMethod: "email",
-  });
-  // Set once the server has sent a sign-up code: { otpToken, sentTo, resendAt, expiresAt, devOtp? }.
-  const [signupOtp, setSignupOtp] = useState(null);
+  const [form, setForm] = useState(emptyAuthForm);
+  // Set once the server has emailed a sign-up or password reset code: { otpToken, sentTo, resendAt, sentAt, devOtp? }.
+  const [otpChallenge, setOtpChallenge] = useState(null);
   const [registeredNames, setRegisteredNames] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem("nexus-registered-names")) || [];
@@ -450,234 +450,125 @@ function App() {
     setJoinConfirm(null);
   };
 
-  // Asks the server to send a 6-digit code to the sign-up email or mobile number.
-  const sendSignupOtp = async () => {
-    if (authSubmitting.current) return;
+  const sessionId = () => sessionStorage.getItem("nexus-session-id") || undefined;
+
+  // Signs the player in on this device and remembers the account and gamer tag for the next visit.
+  const completeAuth = (account) => {
+    const nextUsers = [...registeredUsers.filter((user) => getUserKey(user) !== account.userKey), account];
+    const nextNames = [...registeredNames.filter((name) => name.toLowerCase() !== account.name.toLowerCase()), account.name];
+    localStorage.setItem("nexus-registered-users", JSON.stringify(nextUsers));
+    localStorage.setItem("nexus-registered-names", JSON.stringify(nextNames));
+    localStorage.setItem("nexus-player", JSON.stringify(account));
+    setRegisteredUsers(nextUsers);
+    setRegisteredNames(nextNames);
+    setCoins(0);
+    setPlayer(account);
+    setAuthOpen(false);
+    // The next sign-in on this device (after signing out) starts from the login form.
+    setAuthMode("login");
+    setOtpChallenge(null);
+    setForm(emptyAuthForm);
+    fetch("/api/presence/stats").then((response) => response.json()).then((stats) => {
+      if (stats?.liveCount) setLiveCount(stats.liveCount);
+    }).catch(() => {});
+  };
+
+  // Runs one auth request at a time and shows its error in the form; returns null when it failed.
+  const runAuthRequest = async (request) => {
+    if (authSubmitting.current) return null;
     authSubmitting.current = true;
     setAuthBusy(true);
     setAuthError("");
     try {
-      const result = await postJson("/api/auth/otp/send", {
-        channel: form.signupMethod,
-        displayName: form.username.trim(),
-        email: form.signupMethod === "email" ? form.email.trim() : "",
-        phone: form.signupMethod === "phone" ? form.phone.trim() : "",
-      });
-      // Count the resend wait on this device's clock; the server's clock may differ.
-      const sentAt = Date.now();
-      setSignupOtp({ ...result, sentAt, resendAt: sentAt + result.resendAfterMs });
-      setForm((current) => ({ ...current, otp: "" }));
+      return await request();
     } catch (error) {
       setAuthError(error.message);
+      return null;
     } finally {
       authSubmitting.current = false;
       setAuthBusy(false);
     }
   };
 
-  // Going back to edit the email or number drops the code: it only works for the contact it was sent to.
-  const resetSignupOtp = () => {
-    setSignupOtp(null);
+  // Emails a 6-digit code: to verify a new account, or to reset a forgotten password.
+  const sendOtp = async () => {
+    const result = await runAuthRequest(() => authMode === "forgot"
+      ? postJson("/api/auth/password/forgot", { email: form.email.trim() })
+      : postJson("/api/auth/otp/send", { displayName: form.username.trim(), email: form.email.trim() }));
+    if (!result) return;
+    // Count the resend wait on this device's clock; the server's clock may differ.
+    const sentAt = Date.now();
+    setOtpChallenge({ ...result, sentAt, resendAt: sentAt + result.resendAfterMs });
     setForm((current) => ({ ...current, otp: "" }));
+  };
+
+  // Going back to edit the email drops the code: it only works for the address it was sent to.
+  const resetOtp = () => {
+    setOtpChallenge(null);
+    setForm((current) => ({ ...current, otp: "" }));
+  };
+
+  const handleGoogleCredential = async (credential) => {
+    const result = await runAuthRequest(() => postJson("/api/auth/google", { credential, sessionId: sessionId() }));
+    if (result) completeAuth(toAccount(result.user, result.loginSecret));
   };
 
   const handleAuthSubmit = async (event) => {
     event.preventDefault();
     if (authSubmitting.current) return;
-    const { username, email, phone, password, signupMethod } = form;
+    const { username, email, phone, password } = form;
+    const loginByPhone = authMode === "login" && form.loginMethod === "phone";
+    const askingForCode = authMode !== "login" && !otpChallenge;
 
     if (authMode === "signup" && username.trim().length < 3) {
       setAuthError("Choose a gamer tag with at least 3 characters.");
       return;
     }
-    if (
-      authMode === "signup" &&
-      signupMethod === "phone" &&
-      !/^\+?[0-9\s-]{10,15}$/.test(phone)
-    ) {
-      setAuthError("Enter a valid mobile number.");
+    if (loginByPhone ? !/^\+?[0-9\s-]{10,15}$/.test(phone) : !emailPattern.test(email.trim())) {
+      setAuthError(loginByPhone ? "Enter a valid mobile number." : "Enter a valid Gmail or email address.");
       return;
     }
-    if (
-      authMode === "signup" &&
-      signupMethod === "email" &&
-      !/^\S+@\S+\.\S+$/.test(email)
-    ) {
-      setAuthError("Enter a valid Gmail or email address.");
+    if (authMode === "signup" && registeredNames.some((name) => name.toLowerCase() === username.trim().toLowerCase())) {
+      setAuthError(`That gamer tag is taken. Try ${username.trim()}${Math.floor(Math.random() * 90) + 10}.`);
       return;
     }
-    if (
-      authMode === "login" &&
-      form.loginMethod === "email" &&
-      !/^\S+@\S+\.\S+$/.test(email)
-    ) {
-      setAuthError("Enter a valid email address.");
-      return;
-    }
-    if (
-      authMode === "login" &&
-      form.loginMethod === "phone" &&
-      !/^\+?[0-9\s-]{10,15}$/.test(phone)
-    ) {
-      setAuthError("Enter a valid mobile number.");
-      return;
-    }
-    if (
-      authMode === "signup" &&
-      registeredNames.some(
-        (name) => name.toLowerCase() === username.trim().toLowerCase(),
-      )
-    ) {
-      setAuthError(
-        `That gamer tag is taken. Try ${username.trim()}${Math.floor(Math.random() * 90) + 10}.`,
-      );
-      return;
-    }
-    if (password.length < 6) {
+    // A password reset asks for the new password together with the code.
+    if (!(authMode === "forgot" && askingForCode) && password.length < 6) {
       setAuthError("Your password must be at least 6 characters.");
       return;
     }
 
+    // The server checks every login, so a password changed on another device stops working here too.
     if (authMode === "login") {
-      const loginValue = (form.loginMethod === "email" ? email : phone)
-        .trim()
-        .toLowerCase();
-      let account = registeredUsers.find(
-        (user) =>
-          user[form.loginMethod] === loginValue && user.password === password,
-      );
-      if (!account) {
-        // Accounts made on another phone or browser are only on the server.
-        authSubmitting.current = true;
-        try {
-          const { user } = await postJson("/api/users/login", {
-            login: loginValue,
-            password,
-            sessionId: sessionStorage.getItem("nexus-session-id") || undefined,
-          });
-          account = { name: user.name, email: user.email || "", phone: user.phone || "", password, userKey: user.userKey, coins: 0, status: "active" };
-          const nextUsers = [...registeredUsers.filter((item) => getUserKey(item) !== user.userKey), account];
-          localStorage.setItem("nexus-registered-users", JSON.stringify(nextUsers));
-          setRegisteredUsers(nextUsers);
-        } catch (error) {
-          setAuthError(error.message);
-          return;
-        } finally {
-          authSubmitting.current = false;
-        }
-      }
-      const loginCoins = Number(account.coins) || 0;
-      setCoins(loginCoins);
-      localStorage.setItem("nexus-player", JSON.stringify(account));
-      setPlayer(account);
-      setAuthOpen(false);
-      setForm({
-        username: "",
-        email: "",
-        phone: "",
-        password: "",
-        otp: "",
-        signupMethod: "phone",
-        loginMethod: "email",
-      });
-
-      // Update presence on login
-      void fetch("/api/presence/heartbeat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionId: sessionStorage.getItem("nexus-session-id") || undefined,
-          userKey: getUserKey(account),
-        }),
-      }).then(async (res) => {
-        if (res.ok) {
-          const data = await res.json();
-          if (data.liveCount) setLiveCount(data.liveCount);
-        }
-      }).catch(() => {});
+      const result = await runAuthRequest(() => postJson("/api/users/login", {
+        login: (loginByPhone ? phone : email).trim().toLowerCase(),
+        password,
+        sessionId: sessionId(),
+      }));
+      if (result) completeAuth(toAccount(result.user, password));
       return;
     }
 
-    const nextPlayer = {
-      name: username.trim(),
-      email: signupMethod === "email" ? email.trim().toLowerCase() : "",
-      phone: signupMethod === "phone" ? phone.trim() : "",
-      password,
-      coins: 0,
-      status: "active",
-    };
-    nextPlayer.userKey = getUserKey(nextPlayer);
-    const accountExists = registeredUsers.some(
-      (user) =>
-        (nextPlayer.email && user.email === nextPlayer.email) ||
-        (nextPlayer.phone && user.phone === nextPlayer.phone),
-    );
-    if (accountExists) {
-      setAuthError(
-        "An account already exists with this email or mobile number. Please log in.",
-      );
-      return;
-    }
-
-    // First submit sends a code to the email or number; the second creates the account with it.
-    if (!signupOtp) {
-      await sendSignupOtp();
+    if (askingForCode) {
+      await sendOtp();
       return;
     }
     if (!/^\d{6}$/.test(form.otp.trim())) {
-      setAuthError("Enter the 6-digit code we sent you.");
+      setAuthError("Enter the 6-digit code we emailed you.");
       return;
     }
 
-    // Save the account on the server first: that is what lets it log in and join on any device.
-    authSubmitting.current = true;
-    setAuthBusy(true);
-    try {
-      const { user } = await postJson("/api/users/register", {
-        channel: signupMethod,
-        displayName: nextPlayer.name,
-        email: nextPlayer.email,
-        phone: nextPlayer.phone,
-        password: nextPlayer.password,
-        otpToken: signupOtp.otpToken,
-        otp: form.otp.trim(),
-        sessionId: sessionStorage.getItem("nexus-session-id") || undefined,
-      });
-      nextPlayer.userKey = user.user_key;
-    } catch (error) {
-      setAuthError(error.message);
+    const verification = { email: email.trim(), otpToken: otpChallenge.otpToken, otp: form.otp.trim(), password, sessionId: sessionId() };
+    if (authMode === "forgot") {
+      const result = await runAuthRequest(() => postJson("/api/auth/password/reset", verification));
+      if (result) completeAuth(toAccount(result.user, password));
       return;
-    } finally {
-      authSubmitting.current = false;
-      setAuthBusy(false);
     }
-    setSignupOtp(null);
-    const nextUsers = [...registeredUsers, nextPlayer];
-    const nextNames =
-      authMode === "signup"
-        ? [...registeredNames, nextPlayer.name]
-        : registeredNames;
-    localStorage.setItem("nexus-registered-users", JSON.stringify(nextUsers));
-    setRegisteredUsers(nextUsers);
-    localStorage.setItem("nexus-registered-names", JSON.stringify(nextNames));
-    setRegisteredNames(nextNames);
-    localStorage.setItem("nexus-player", JSON.stringify(nextPlayer));
-    setCoins(0);
-    setPlayer(nextPlayer);
-    setAuthOpen(false);
-    setForm({
-      username: "",
-      email: "",
-      phone: "",
-      password: "",
-      otp: "",
-      signupMethod: "phone",
-      loginMethod: "email",
-    });
-
-    fetch("/api/presence/stats").then((response) => response.json()).then((stats) => {
-      if (stats?.liveCount) setLiveCount(stats.liveCount);
-    }).catch(() => {});
+    const result = await runAuthRequest(() => postJson("/api/users/register", { ...verification, displayName: username.trim() }));
+    if (result) {
+      const { user } = result;
+      completeAuth(toAccount({ userKey: user.user_key, name: user.display_name, email: user.email, phone: user.phone }, password));
+    }
   };
 
   const handleSignOut = () => {
@@ -997,9 +888,10 @@ function App() {
         setForm={setForm}
         handleAuthSubmit={handleAuthSubmit}
         authBusy={authBusy}
-        signupOtp={signupOtp}
-        onResendOtp={sendSignupOtp}
-        onResetOtp={resetSignupOtp}
+        otpChallenge={otpChallenge}
+        onResendOtp={sendOtp}
+        onResetOtp={resetOtp}
+        onGoogleCredential={handleGoogleCredential}
         player={player}
         profileStats={profileStats}
         handleSignOut={handleSignOut}

@@ -26,6 +26,9 @@ import {
   registerOrUpdateUser,
   registerVerifiedUser,
   requestSignupOtp,
+  requestPasswordResetOtp,
+  resetPassword,
+  loginWithGoogle,
   updateUserProfile,
   syncUsers,
   adminSetUserStatus,
@@ -228,6 +231,45 @@ async function handleApiRequest(request, response) {
       sendJson(response, 200, { success: true, ...stats })
     } catch (error) {
       sendJson(response, 400, { message: error instanceof Error ? error.message : 'Could not record heartbeat.' })
+    }
+    return
+  }
+
+  // The browser reads the Google client ID here, so GOOGLE_CLIENT_ID is the only setting to change.
+  if (request.method === 'GET' && pathname === '/api/auth/config') {
+    sendJson(response, 200, { googleClientId: process.env.GOOGLE_CLIENT_ID || '' })
+    return
+  }
+
+  if (request.method === 'POST' && pathname === '/api/auth/google') {
+    try {
+      const body = await readBody(request)
+      const result = await loginWithGoogle(body)
+      if (body.sessionId) recordUserPresence({ sessionId: body.sessionId, userKey: result.user.userKey })
+      sendJson(response, 200, result)
+    } catch (error) {
+      sendError(response, error, 'Could not sign in with Google.')
+    }
+    return
+  }
+
+  if (request.method === 'POST' && pathname === '/api/auth/password/forgot') {
+    try {
+      sendJson(response, 200, await requestPasswordResetOtp(await readBody(request)))
+    } catch (error) {
+      sendError(response, error, 'Could not send the code.')
+    }
+    return
+  }
+
+  if (request.method === 'POST' && pathname === '/api/auth/password/reset') {
+    try {
+      const body = await readBody(request)
+      const user = resetPassword(body)
+      if (body.sessionId) recordUserPresence({ sessionId: body.sessionId, userKey: user.userKey })
+      sendJson(response, 200, { user })
+    } catch (error) {
+      sendError(response, error, 'Could not reset the password.')
     }
     return
   }

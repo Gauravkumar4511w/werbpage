@@ -38,7 +38,8 @@ before(async () => {
   const login = await request('/api/admin/login', { body: { email: process.env.ADMIN_EMAIL, password: process.env.ADMIN_PASSWORD } })
   admin = { authorization: `Bearer ${login.data.token}` }
   for (const [index, player] of players.entries()) {
-    await signUp(request, { channel: 'phone', phone: player.userKey, displayName: `Player${index + 1}`, password: player.password })
+    // Sign-up is by email now; mobile-number accounts come from before that, so create them directly.
+    db.registerOrUpdateUser({ userKey: player.userKey, displayName: `Player${index + 1}`, phone: player.userKey, password: player.password }, { trusted: true })
     db.adjustUserBalance({ userKey: player.userKey, amount: 1000, wallet: 'credit' })
   }
 })
@@ -135,8 +136,8 @@ test('players can log in on another device with the number typed differently', a
 })
 
 test('re-registering a number cannot replace its password or undo a deactivation', async () => {
-  const takeover = await signUp(request, { channel: 'phone', phone: players[0].userKey, displayName: 'Attacker', password: 'attacker-pass' })
-  assert.equal(takeover.status, 409)
+  const takeover = await request('/api/users/register', { body: { userKey: players[0].userKey, phone: players[0].userKey, displayName: 'Attacker', password: 'attacker-pass' } })
+  assert.equal(takeover.status, 400)
   const wallet = await request('/api/users/wallet', { body: players[0] })
   assert.equal(wallet.status, 200)
 
