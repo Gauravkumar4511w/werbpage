@@ -24,6 +24,8 @@ import {
   getLiveStats,
   loginUser,
   registerOrUpdateUser,
+  registerVerifiedUser,
+  requestSignupOtp,
   updateUserProfile,
   syncUsers,
   adminSetUserStatus,
@@ -230,10 +232,20 @@ async function handleApiRequest(request, response) {
     return
   }
 
+  if (request.method === 'POST' && pathname === '/api/auth/otp/send') {
+    try {
+      sendJson(response, 200, await requestSignupOtp(await readBody(request)))
+    } catch (error) {
+      sendError(response, error, 'Could not send the code.')
+    }
+    return
+  }
+
+  // New players must send the code from /api/auth/otp/send; see registerVerifiedUser().
   if (request.method === 'POST' && pathname === '/api/users/register') {
     try {
       const body = await readBody(request)
-      const user = registerOrUpdateUser(body)
+      const user = registerVerifiedUser(body)
       if (body.sessionId) {
         recordUserPresence({ sessionId: body.sessionId, userKey: user.user_key })
       }

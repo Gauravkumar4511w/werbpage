@@ -11,6 +11,7 @@ process.env.ADMIN_EMAIL = 'admin-test@example.com'
 process.env.ADMIN_PASSWORD = 'test-only-private-password'
 process.env.ADMIN_SESSION_SECRET = 'test-only-session-secret'
 const { default: handle } = await import('../server.js')
+const { signUp } = await import('./signup-helper.js')
 after(() => fs.rmSync(directory, { recursive: true, force: true }))
 
 async function request(url, { method = 'POST', body, headers = {}, query } = {}) {
@@ -51,15 +52,7 @@ test('presence heartbeat and live stats track real online sessions', async () =>
 
 test('user registration and sync stores active users counted in admin overview', async () => {
   // Register a user
-  const reg = await request('/api/users/register', {
-    method: 'POST',
-    body: {
-      userKey: 'active-gamer@test.com',
-      displayName: 'ActiveGamer',
-      email: 'active-gamer@test.com',
-      password: 'password123',
-    },
-  })
+  const reg = await signUp(request, { email: 'active-gamer@test.com', displayName: 'ActiveGamer', password: 'password123' })
   assert.equal(reg.status, 200)
   assert.equal(reg.data.success, true)
   assert.equal(reg.data.user.status, 'active')

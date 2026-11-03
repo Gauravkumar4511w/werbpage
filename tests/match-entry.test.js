@@ -13,6 +13,7 @@ process.env.ADMIN_SESSION_SECRET = 'test-only-session-secret'
 const { default: handle } = await import('../server.js')
 const db = await import('../lib/payout-db.js')
 const { getScheduledMatches } = await import('../lib/match-schedule.js')
+const { signUp } = await import('./signup-helper.js')
 after(() => fs.rmSync(directory, { recursive: true, force: true }))
 
 async function request(url, { method = 'POST', body, headers = {}, query } = {}) {
@@ -36,7 +37,7 @@ before(async () => {
   const login = await request('/api/admin/login', { body: { email: process.env.ADMIN_EMAIL, password: process.env.ADMIN_PASSWORD } })
   admin = { authorization: `Bearer ${login.data.token}` }
   for (const [index, player] of players.entries()) {
-    await request('/api/users/register', { body: { ...player, displayName: `Player${index + 1}`, phone: player.userKey } })
+    await signUp(request, { channel: 'phone', phone: player.userKey, displayName: `Player${index + 1}`, password: player.password })
     db.adjustUserBalance({ userKey: player.userKey, amount: 1000, wallet: 'credit' })
   }
 })
@@ -133,7 +134,7 @@ test('players can log in on another device with the number typed differently', a
 })
 
 test('re-registering a number cannot replace its password or undo a deactivation', async () => {
-  const takeover = await request('/api/users/register', { body: { userKey: players[0].userKey, password: 'attacker-pass' } })
+  const takeover = await signUp(request, { channel: 'phone', phone: players[0].userKey, displayName: 'Attacker', password: 'attacker-pass' })
   assert.equal(takeover.status, 409)
   const wallet = await request('/api/users/wallet', { body: players[0] })
   assert.equal(wallet.status, 200)
@@ -184,6 +185,6 @@ test('profile edits need the password, stay unique and keep a way to log in', as
   assert.equal((await change(players[0], { email: '', phone: '' })).status, 400)
   assert.equal((await change(players[0], { phone: '12' })).status, 400)
 
-  const signup = await request('/api/users/register', { body: { userKey: 'two@gmail.com', email: 'two@gmail.com', password: 'someone-else' } })
+  const signup = await signUp(request, { email: 'two@gmail.com', displayName: 'SomeoneElse', password: 'someone-else' })
   assert.equal(signup.status, 409)
 })

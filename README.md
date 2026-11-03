@@ -61,6 +61,22 @@ Player balances live on the server, in the `users` table. The browser only cache
 - **Withdrawals.** A request holds the player's winning coins straight away. **Mark paid** after you send the money; **Reject** refunds the coins.
 - **Match fees.** The server charges the stored entry fee when a player joins. Deleting a match refunds every player who joined it.
 
+## Sign-up OTP
+
+New players verify their mobile number or email before the account is created:
+
+1. The sign-up form posts to `/api/auth/otp/send`. The server checks the email, number and gamer tag are free, sends a 6-digit code and returns a signed `otpToken`.
+2. The player types the code in the box that appears under the form. `/api/users/register` creates the account only when the code matches that token and that exact email or number.
+
+Codes expire after 10 minutes. A number or email gets one code every 30 seconds and five an hour, and a code locks after five wrong tries. The token is signed with `OTP_SECRET` (falling back to `ADMIN_SESSION_SECRET`), so it verifies on any serverless instance; keep that secret identical everywhere.
+
+Providers, set in `.env` and in the Vercel environment variables:
+
+- **SMS:** `FAST2SMS_API_KEY` for Indian (+91) numbers, or `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` and `TWILIO_FROM` (or `TWILIO_MESSAGING_SERVICE_SID`) for any country.
+- **Email:** `RESEND_API_KEY` and `OTP_EMAIL_FROM`, on a domain verified in Resend.
+
+Without a provider, `npm run dev` shows the code on screen so you can test. A deployed site refuses to sign up through a channel with no provider, unless you set `OTP_DEV_MODE=true` for a test deploy.
+
 ## Vercel deployment
 
 Vercel deploys one serverless function, `api/index.js`. `vercel.json` rewrites every `/api/*` request to it and `server.js` routes the request. `.vercelignore` leaves the other files in `api/` out of the deployment, because the Hobby plan allows at most 12 functions per deployment.

@@ -11,6 +11,7 @@ process.env.ADMIN_EMAIL = 'admin-test@example.com'
 process.env.ADMIN_PASSWORD = 'test-only-private-password'
 process.env.ADMIN_SESSION_SECRET = 'test-only-session-secret'
 const { default: handle } = await import('../server.js')
+const { signUp } = await import('./signup-helper.js')
 after(() => fs.rmSync(directory, { recursive: true, force: true }))
 
 async function request(url, { method = 'POST', body, headers = {}, query } = {}) {
@@ -30,7 +31,7 @@ const player = { userKey: 'wallet-player@test.com', password: 'secret123' }
 before(async () => {
   const login = await request('/api/admin/login', { body: { email: process.env.ADMIN_EMAIL, password: process.env.ADMIN_PASSWORD } })
   admin = { authorization: `Bearer ${login.data.token}` }
-  await request('/api/users/register', { body: { ...player, displayName: 'WalletPlayer', email: player.userKey } })
+  await signUp(request, { email: player.userKey, displayName: 'WalletPlayer', password: player.password })
 })
 
 test('a UTR top-up notifies the admin and credits coins only after approval', async () => {

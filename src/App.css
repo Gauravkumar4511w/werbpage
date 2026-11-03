@@ -133,6 +133,18 @@
 .auth-close { position: absolute; top: 16px; right: 18px; width: 28px; height: 28px; border: 1px solid rgba(255,255,255,.13); color: #a09da1; background: transparent; font-size: 16px; line-height: 1; cursor: pointer; }.auth-close:hover { color: #fff; border-color: #ff765b; }
 .auth-kicker { color: #ff8065; font-size: 10px; font-weight: 700; letter-spacing: .18em; }.auth-kicker span { display: inline-block; width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; background: #ff623e; box-shadow: 0 0 10px #ff623e; }.auth-modal h2 { margin: 13px 0 8px; color: #f5f1eb; font-family: var(--heading); font-size: 37px; line-height: 1; letter-spacing: .02em; }.auth-subtitle { margin-bottom: 27px; color: #929097; font-size: 13px; line-height: 1.5; }.auth-modal form { display: grid; gap: 17px; }.auth-modal label { display: grid; gap: 7px; color: #bab6b9; font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }.auth-modal input { width: 100%; padding: 13px 14px; border: 1px solid #373841; outline: 0; color: #f5f1eb; background: #0e0f14; font-size: 13px; transition: border-color .2s, box-shadow .2s; }.auth-modal input::placeholder { color: #5d5b62; }.auth-modal input:focus { border-color: #ff765b; box-shadow: 0 0 0 3px rgba(255,118,91,.12); }.password-field { position: relative; }.password-field input { padding-right: 58px; }.password-field button { position: absolute; top: 0; right: 0; bottom: 0; padding: 0 13px; border: 0; color: #ff927d; background: transparent; font-size: 10px; font-weight: 700; text-transform: uppercase; cursor: pointer; }.auth-error { margin: -4px 0 -3px; color: #ff957f; font-size: 11px; }.auth-submit { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; padding: 14px 16px; border: 0; color: #171216; background: #ff765b; font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; cursor: pointer; transition: background .2s, transform .2s; }.auth-submit:hover { background: #ff927a; transform: translateY(-1px); }.auth-submit span { font-size: 16px; }.auth-switch { margin-top: 25px; color: #85828a; font-size: 12px; text-align: center; }.auth-switch button, .sign-out { padding: 0; border: 0; color: #ff927d; background: transparent; font-size: inherit; cursor: pointer; }.auth-switch button:hover, .sign-out:hover { text-decoration: underline; }.sign-out { display: block; margin: 18px auto 0; color: #85828a; font-size: 11px; }.profile-button:hover .avatar { border-color: #ff765b; }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } } @keyframes modal-in { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.otp-panel { display: grid; gap: 12px; padding: 14px; border: 1px solid rgba(255,118,91,.32); background: rgba(255,118,91,.05); animation: modal-in .22s ease-out; }
+.otp-sent { margin: 0; color: #bab6b9; font-size: 12px; line-height: 1.5; }
+.otp-sent strong { color: #f5f1eb; }
+.otp-sent button, .otp-resend { padding: 0; border: 0; color: #ff927d; background: transparent; font-size: 11px; font-weight: 700; cursor: pointer; }
+.otp-sent button { margin-left: 6px; text-decoration: underline; }
+.otp-resend { justify-self: start; }
+.otp-resend:disabled { color: #5d5b62; cursor: default; }
+.otp-dev { margin: 0; padding: 8px 10px; border: 1px dashed #5d5b62; color: #929097; font-size: 11px; line-height: 1.5; }
+.otp-dev strong { color: #ffad99; letter-spacing: .2em; }
+.auth-modal input.otp-input { font-size: 22px; font-weight: 700; letter-spacing: .5em; text-align: center; }
+.auth-submit:disabled { opacity: .6; cursor: wait; transform: none; }
+.auth-modal input[readonly] { color: #85828a; cursor: not-allowed; }
 @media (max-width: 480px) { .auth-backdrop { padding: 16px; }.auth-modal { padding: 37px 24px 26px; }.auth-modal h2 { font-size: 32px; } }
 
 .library-section { max-width: 1440px; margin: 0 auto; padding: 76px 58px 92px; background: #101217; border-top: 1px solid rgba(255,255,255,.08); }
@@ -638,6 +650,12 @@ body { background: #07111c; }
 }
 
 .auth-backdrop { z-index: 100; }
+
+/* The sign-up form with its OTP box is taller than short laptop screens, so let it scroll. */
+.auth-modal {
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+}
 
 .profile-modal {
   width: min(100%, 560px);
