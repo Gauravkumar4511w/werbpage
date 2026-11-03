@@ -143,3 +143,33 @@ test('Fast2SMS receives the code for Indian numbers', async () => {
     delete process.env.FAST2SMS_API_KEY
   }
 })
+
+test('MSG91 receives the code with the template and full number', async () => {
+  const realFetch = globalThis.fetch
+  const calls = []
+  globalThis.fetch = async (url, options) => {
+    calls.push({ url: new URL(url), options })
+    return new Response(JSON.stringify({ type: 'success', request_id: 'abc' }), { status: 200 })
+  }
+  process.env.MSG91_AUTH_KEY = 'test-auth-key'
+  process.env.MSG91_TEMPLATE_ID = 'template-123'
+  try {
+    const sent = await send({ channel: 'phone', phone: '+91 97777 88888', displayName: 'Msg91Player' })
+    assert.equal(sent.status, 200, JSON.stringify(sent.data))
+    assert.equal(sent.data.devOtp, undefined)
+    const { url, options } = calls[0]
+    assert.equal(url.origin + url.pathname, 'https://control.msg91.com/api/v5/otp')
+    assert.equal(url.searchParams.get('template_id'), 'template-123')
+    assert.equal(url.searchParams.get('mobile'), '919777788888')
+    assert.match(url.searchParams.get('otp'), /^\d{6}$/)
+    assert.equal(options.headers.authkey, 'test-auth-key')
+
+    globalThis.fetch = async () => new Response(JSON.stringify({ type: 'error', message: 'Invalid template' }), { status: 200 })
+    const failed = await send({ channel: 'phone', phone: '+91 96666 55555', displayName: 'Msg91Player2' })
+    assert.equal(failed.status, 502)
+  } finally {
+    globalThis.fetch = realFetch
+    delete process.env.MSG91_AUTH_KEY
+    delete process.env.MSG91_TEMPLATE_ID
+  }
+})
