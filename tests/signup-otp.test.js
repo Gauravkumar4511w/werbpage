@@ -1,4 +1,5 @@
 /* global process, Buffer */
+import './isolate-env.js'
 import assert from 'node:assert/strict'
 import { after, test } from 'node:test'
 import fs from 'node:fs'
