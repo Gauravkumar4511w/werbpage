@@ -124,6 +124,7 @@ function App() {
   const [authMode, setAuthMode] = useState("login");
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState("");
+  const [authBusy, setAuthBusy] = useState(false);
   const [walletOpen, setWalletOpen] = useState(false);
   const [walletTab, setWalletTab] = useState("buy");
   const [coins, setCoins] = useState(0);
@@ -180,9 +181,12 @@ function App() {
     email: "",
     phone: "",
     password: "",
+    otp: "",
     signupMethod: "phone",
     loginMethod: "email",
   });
+  // Set once the server has sent a sign-up code: { otpToken, sentTo, resendAt, expiresAt, devOtp? }.
+  const [signupOtp, setSignupOtp] = useState(null);
   const [registeredNames, setRegisteredNames] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem("nexus-registered-names")) || [];
@@ -446,6 +450,37 @@ function App() {
     setJoinConfirm(null);
   };
 
+  // Asks the server to send a 6-digit code to the sign-up email or mobile number.
+  const sendSignupOtp = async () => {
+    if (authSubmitting.current) return;
+    authSubmitting.current = true;
+    setAuthBusy(true);
+    setAuthError("");
+    try {
+      const result = await postJson("/api/auth/otp/send", {
+        channel: form.signupMethod,
+        displayName: form.username.trim(),
+        email: form.signupMethod === "email" ? form.email.trim() : "",
+        phone: form.signupMethod === "phone" ? form.phone.trim() : "",
+      });
+      // Count the resend wait on this device's clock; the server's clock may differ.
+      const sentAt = Date.now();
+      setSignupOtp({ ...result, sentAt, resendAt: sentAt + result.resendAfterMs });
+      setForm((current) => ({ ...current, otp: "" }));
+    } catch (error) {
+      setAuthError(error.message);
+    } finally {
+      authSubmitting.current = false;
+      setAuthBusy(false);
+    }
+  };
+
+  // Going back to edit the email or number drops the code: it only works for the contact it was sent to.
+  const resetSignupOtp = () => {
+    setSignupOtp(null);
+    setForm((current) => ({ ...current, otp: "" }));
+  };
+
   const handleAuthSubmit = async (event) => {
     event.preventDefault();
     if (authSubmitting.current) return;
@@ -541,6 +576,7 @@ function App() {
         email: "",
         phone: "",
         password: "",
+        otp: "",
         signupMethod: "phone",
         loginMethod: "email",
       });
@@ -583,23 +619,39 @@ function App() {
       return;
     }
 
+    // First submit sends a code to the email or number; the second creates the account with it.
+    if (!signupOtp) {
+      await sendSignupOtp();
+      return;
+    }
+    if (!/^\d{6}$/.test(form.otp.trim())) {
+      setAuthError("Enter the 6-digit code we sent you.");
+      return;
+    }
+
     // Save the account on the server first: that is what lets it log in and join on any device.
     authSubmitting.current = true;
+    setAuthBusy(true);
     try {
-      await postJson("/api/users/register", {
-        userKey: nextPlayer.userKey,
+      const { user } = await postJson("/api/users/register", {
+        channel: signupMethod,
         displayName: nextPlayer.name,
         email: nextPlayer.email,
         phone: nextPlayer.phone,
         password: nextPlayer.password,
+        otpToken: signupOtp.otpToken,
+        otp: form.otp.trim(),
         sessionId: sessionStorage.getItem("nexus-session-id") || undefined,
       });
+      nextPlayer.userKey = user.user_key;
     } catch (error) {
       setAuthError(error.message);
       return;
     } finally {
       authSubmitting.current = false;
+      setAuthBusy(false);
     }
+    setSignupOtp(null);
     const nextUsers = [...registeredUsers, nextPlayer];
     const nextNames =
       authMode === "signup"
@@ -618,6 +670,7 @@ function App() {
       email: "",
       phone: "",
       password: "",
+      otp: "",
       signupMethod: "phone",
       loginMethod: "email",
     });
@@ -943,6 +996,10 @@ function App() {
         form={form}
         setForm={setForm}
         handleAuthSubmit={handleAuthSubmit}
+        authBusy={authBusy}
+        signupOtp={signupOtp}
+        onResendOtp={sendSignupOtp}
+        onResetOtp={resetSignupOtp}
         player={player}
         profileStats={profileStats}
         handleSignOut={handleSignOut}
