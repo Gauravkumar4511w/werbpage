@@ -126,6 +126,7 @@ function AuthModal({ authOpen, setAuthOpen, authMode, setAuthMode, showPassword,
           <button className="auth-submit" type="submit" disabled={authBusy}>{authBusy ? 'Please wait...' : <>{submitLabel} <span>-&gt;</span></>}</button>
           {authError && <p className="auth-error" role="alert">{authError}</p>}
         </form>
+        {authMode !== 'forgot' && <p className="auth-legal">By continuing, you agree to our <a href="/terms.html" target="_blank" rel="noreferrer">Terms</a> and <a href="/privacy.html" target="_blank" rel="noreferrer">Privacy Policy</a>.</p>}
         {authMode === 'forgot'
           ? <p className="auth-switch">Remembered it? <button type="button" onClick={() => switchMode('login')}>Back to log in</button></p>
           : <p className="auth-switch">{authMode === 'login' ? 'New to ArenaCore?' : 'Already have an account?'} <button type="button" onClick={() => switchMode(authMode === 'login' ? 'signup' : 'login')}>{authMode === 'login' ? 'Sign up' : 'Log in'}</button></p>}

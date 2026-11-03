@@ -1,0 +1,60 @@
+/* Shared by privacy.html and terms.html: plain reading pages in the site's dark colours. */
+:root {
+  --bg: #0b1119;
+  --text: #d8dde3;
+  --muted: #8d96a0;
+  --heading: #f5f1eb;
+  --accent: #ff927d;
+  --rule: rgba(255, 255, 255, .1);
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #faf8f5;
+    --text: #2b2f35;
+    --muted: #6b7178;
+    --heading: #14171c;
+    --accent: #c4462c;
+    --rule: rgba(0, 0, 0, .1);
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  color: var(--text);
+  background: var(--bg);
+  font: 16px/1.65 "Fira Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 32px 16px 64px;
+}
+
+h1 {
+  margin: 24px 0 4px;
+  color: var(--heading);
+  font-size: 2rem;
+  line-height: 1.2;
+}
+
+h2 {
+  margin: 32px 0 8px;
+  padding-top: 20px;
+  border-top: 1px solid var(--rule);
+  color: var(--heading);
+  font-size: 1.15rem;
+}
+
+ul { padding-left: 20px; }
+li { margin: 6px 0; }
+strong { color: var(--heading); }
+
+a { color: var(--accent); }
+.back { font-size: .9rem; text-decoration: none; }
+.back:hover { text-decoration: underline; }
+.updated, .related { color: var(--muted); font-size: .9rem; }
+.related { margin-top: 40px; }
