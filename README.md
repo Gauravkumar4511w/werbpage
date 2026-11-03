@@ -73,7 +73,7 @@ Codes expire after 10 minutes. A number or email gets one code every 30 seconds 
 Providers, set in `.env` and in the Vercel environment variables:
 
 - **SMS:** `MSG91_AUTH_KEY` and `MSG91_TEMPLATE_ID` (an approved MSG91 OTP template whose text uses `##OTP##`), `FAST2SMS_API_KEY` for Indian (+91) numbers, or `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` and `TWILIO_FROM` (or `TWILIO_MESSAGING_SERVICE_SID`) for any country.
-- **Email:** `RESEND_API_KEY` and `OTP_EMAIL_FROM`, on a domain verified in Resend.
+- **Email:** `GMAIL_USER` and `GMAIL_APP_PASSWORD` send from a Gmail account for free (about 500 emails a day). Turn on 2-Step Verification, then create the App Password at myaccount.google.com/apppasswords. `SMTP_HOST` and `SMTP_PORT` use another SMTP server with the same login. Or set `RESEND_API_KEY` and `OTP_EMAIL_FROM`, on a domain verified in Resend.
 
 Without a provider, `npm run dev` shows the code on screen so you can test. A deployed site refuses to sign up through a channel with no provider, unless you set `OTP_DEV_MODE=true` for a test deploy.
 
