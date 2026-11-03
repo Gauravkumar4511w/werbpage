@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict'
 import { after, test } from 'node:test'
 import fs from 'node:fs'
+import net from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
 
@@ -141,5 +142,88 @@ test('Fast2SMS receives the code for Indian numbers', async () => {
   } finally {
     globalThis.fetch = realFetch
     delete process.env.FAST2SMS_API_KEY
+  }
+})
+
+test('MSG91 receives the code with the template and full number', async () => {
+  const realFetch = globalThis.fetch
+  const calls = []
+  globalThis.fetch = async (url, options) => {
+    calls.push({ url: new URL(url), options })
+    return new Response(JSON.stringify({ type: 'success', request_id: 'abc' }), { status: 200 })
+  }
+  process.env.MSG91_AUTH_KEY = 'test-auth-key'
+  process.env.MSG91_TEMPLATE_ID = 'template-123'
+  try {
+    const sent = await send({ channel: 'phone', phone: '+91 97777 88888', displayName: 'Msg91Player' })
+    assert.equal(sent.status, 200, JSON.stringify(sent.data))
+    assert.equal(sent.data.devOtp, undefined)
+    const { url, options } = calls[0]
+    assert.equal(url.origin + url.pathname, 'https://control.msg91.com/api/v5/otp')
+    assert.equal(url.searchParams.get('template_id'), 'template-123')
+    assert.equal(url.searchParams.get('mobile'), '919777788888')
+    assert.match(url.searchParams.get('otp'), /^\d{6}$/)
+    assert.equal(options.headers.authkey, 'test-auth-key')
+
+    globalThis.fetch = async () => new Response(JSON.stringify({ type: 'error', message: 'Invalid template' }), { status: 200 })
+    const failed = await send({ channel: 'phone', phone: '+91 96666 55555', displayName: 'Msg91Player2' })
+    assert.equal(failed.status, 502)
+  } finally {
+    globalThis.fetch = realFetch
+    delete process.env.MSG91_AUTH_KEY
+    delete process.env.MSG91_TEMPLATE_ID
+  }
+})
+
+// A minimal SMTP server that accepts one login and records each message it receives.
+function startFakeSmtp() {
+  const messages = []
+  const server = net.createServer((socket) => {
+    let data = null
+    let buffer = ''
+    const reply = (line) => socket.write(`${line}\r\n`)
+    reply('220 fake.smtp ready')
+    socket.on('data', (chunk) => {
+      buffer += chunk
+      let index
+      while ((index = buffer.indexOf('\r\n')) >= 0) {
+        const line = buffer.slice(0, index)
+        buffer = buffer.slice(index + 2)
+        if (data !== null) {
+          if (line === '.') { messages.push(data); data = null; reply('250 queued') } else data += `${line}\n`
+        } else if (/^(EHLO|HELO)/i.test(line)) reply('250-fake.smtp\r\n250 AUTH PLAIN LOGIN')
+        else if (/^AUTH PLAIN/i.test(line)) {
+          const [, user, pass] = Buffer.from(line.split(' ')[2], 'base64').toString().split('\0')
+          reply(user === 'arenacore@gmail.com' && pass === 'abcdefghijklmnop' ? '235 ok' : '535 bad login')
+        } else if (/^DATA/i.test(line)) { data = ''; reply('354 go') }
+        else if (/^QUIT/i.test(line)) { reply('221 bye'); socket.end() }
+        else reply('250 ok')
+      }
+    })
+  })
+  return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve({ server, messages, port: server.address().port })))
+}
+
+test('Gmail sends the code by email with the app password', async () => {
+  const smtp = await startFakeSmtp()
+  Object.assign(process.env, { GMAIL_USER: 'arenacore@gmail.com', GMAIL_APP_PASSWORD: 'abcd efgh ijkl mnop', SMTP_HOST: '127.0.0.1', SMTP_PORT: String(smtp.port) })
+  try {
+    const sent = await send({ channel: 'email', email: 'gmail-player@test.com', displayName: 'GmailPlayer' })
+    assert.equal(sent.status, 200, JSON.stringify(sent.data))
+    assert.equal(sent.data.devOtp, undefined)
+    assert.equal(smtp.messages.length, 1)
+    const code = smtp.messages[0].match(/Subject: (\d{6}) is your ArenaCore code/)?.[1]
+    assert.ok(code, smtp.messages[0])
+    assert.match(smtp.messages[0], /To: gmail-player@test\.com/)
+
+    const created = await register({ channel: 'email', email: 'gmail-player@test.com', displayName: 'GmailPlayer', password: 'secret123', otpToken: sent.data.otpToken, otp: code })
+    assert.equal(created.status, 200, JSON.stringify(created.data))
+
+    process.env.GMAIL_APP_PASSWORD = 'wrong password'
+    const failed = await send({ channel: 'email', email: 'gmail-player2@test.com', displayName: 'GmailPlayer2' })
+    assert.equal(failed.status, 502)
+  } finally {
+    for (const key of ['GMAIL_USER', 'GMAIL_APP_PASSWORD', 'SMTP_HOST', 'SMTP_PORT']) delete process.env[key]
+    smtp.server.close()
   }
 })
