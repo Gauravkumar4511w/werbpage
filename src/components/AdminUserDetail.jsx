@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { formatDate, ledgerReasons, withdrawalDestination } from './adminFormat'
 import ScreenshotButton from './ScreenshotButton'
 import { matchState } from '../myMatches.js'
+import { formatMatchLabel } from '../../lib/match-schedule.js'
 
 const sections = [
   ['matches', 'Joined matches'],
@@ -27,7 +28,7 @@ function JoinedMatchesTable({ title, rows, emptyText }) {
         <tbody>
           {rows.length ? rows.map(({ row, result }) => (
             <tr key={row.match_id}>
-              <td>{row.public_id ? `#${row.public_id}` : row.match_id}</td>
+              <td>{formatMatchLabel(row)}</td>
               <td>{row.team_no ? `#${row.team_no}` : '-'}</td>
               <td>{row.mode || '-'}</td>
               <td>{row.match_timestamp ? formatDate(Number(row.match_timestamp)) : '-'}</td>

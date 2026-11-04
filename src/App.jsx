@@ -10,7 +10,7 @@ import { countUpcomingMatches } from "./myMatches.js";
 import Navbar from "./components/Navbar";
 import TournamentSection from "./components/TournamentSection";
 import WalletModal from "./components/WalletModal";
-import { EDIT_LOCK_MS, getTeamSize } from "../lib/match-schedule.js";
+import { EDIT_LOCK_MS, formatMatchNo, getTeamSize } from "../lib/match-schedule.js";
 import { imageFileToDataUrl } from "./imageUpload.js";
 
 const userDataStorageKey = "nexus-user-data";
@@ -79,7 +79,7 @@ function joinedMatchesFromServer(entries, previous) {
     const identifiers = entry.identifiers?.length ? entry.identifiers : local?.identifiers || [local?.identifier].filter(Boolean);
     return {
       id,
-      publicId: entry.publicId ? `#${entry.publicId}` : local?.publicId || "",
+      publicId: formatMatchNo(entry.dayNo) || (entry.publicId ? `#${entry.publicId}` : local?.publicId || ""),
       mode: entry.mode || local?.mode || "",
       matchTimestamp: Number(entry.matchTimestamp) || local?.matchTimestamp || 0,
       entryFee: Number(entry.entryFee) || local?.entryFee || 0,

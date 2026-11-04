@@ -42,3 +42,14 @@ export const ledgerReasons = {
   withdrawal_hold: 'Withdrawal requested',
   withdrawal_refund: 'Withdrawal refunded',
 }
+
+// Match start time in India, e.g. "8:00 pm".
+export function formatTime(value) {
+  const date = toDate(value)
+  return date ? date.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' }) : '-'
+}
+
+// A match day ("2026-11-04") as "Wed, 4 Nov".
+export function formatDay(day) {
+  return day ? new Date(`${day}T00:00:00Z`).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }) : '-'
+}

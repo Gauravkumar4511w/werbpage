@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { DEFAULT_ENTRY_FEES, EDIT_LOCK_MS, MATCH_MODES, getMatchCapacity, getScheduledMatches } from '../../lib/match-schedule.js'
+import { DEFAULT_ENTRY_FEES, EDIT_LOCK_MS, MATCH_MODES, formatMatchNo, getMatchCapacity, getScheduledMatches } from '../../lib/match-schedule.js'
 import freeFireMaxIcon from '../assets/hero-banner.jpg'
 import battleRoyalImage from '../assets/battelroyal.jpg'
 import clashSquadImage from '../assets/clashsquad.jpg'
@@ -15,7 +15,7 @@ function getLocalSchedule() {
 function fromCatalog(match) {
   return {
     id: String(match.match_id).toLowerCase(),
-    publicId: match.public_id ? `#${match.public_id}` : '',
+    publicId: formatMatchNo(match.day_no) || (match.public_id ? `#${match.public_id}` : ''),
     mode: match.mode,
     description: match.description || '',
     entryFee: Number(match.entry_fee) || DEFAULT_ENTRY_FEES[match.mode],
@@ -192,7 +192,7 @@ function TournamentSection({ tournamentsOpen, onBack, joinedMatches, onJoinMatch
                 const hasStarted = Boolean(match.matchTimestamp) && currentTime >= match.matchTimestamp
                 const hasEnded = match.status === 'confirmed'
                 const isFull = !isJoined && joinedCount >= matchCapacity.total
-                const canEdit = isJoined && currentTime < match.matchTimestamp - EDIT_LOCK_MS
+                const canEdit = isJoined && !hasEnded && currentTime < match.matchTimestamp - EDIT_LOCK_MS
                 const isClosed = !isJoined && (hasEnded || hasStarted || isFull)
                 const buttonLabel = isJoined ? (canEdit ? 'Edit' : 'Joined') : hasEnded ? 'Ended' : hasStarted ? 'Closed' : isFull ? 'Full' : 'Join'
                 const details = { ...match, entryFee, joinedEntry, hasStarted, isFull }

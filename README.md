@@ -68,7 +68,8 @@ Player balances live on the server, in the `users` table. The browser only cache
 - **Add active user.** Give the player a login password and share it with them. An email account added without one is taken over by whoever signs up with that email (with its opening coins); nobody can use an account that has no password.
 - **Deactivate.** A deactivated player cannot log in (password or Google), open the wallet, join matches or withdraw, and is signed out on their next wallet refresh.
 - **Match fees.** The server charges the stored entry fee when a player joins. Deleting a match refunds every player who joined it. A match whose result is confirmed cannot be deleted, and confirming twice never pays twice.
-- **Kills.** Enter the match's public ID (such as `#000001`) and a player who joined it.
+- **Daily matches and numbers.** Only today's matches exist: each day's 14 matches are made when that day starts (India time), and a later day's unjoined matches are removed. Matches are numbered per day, `#01`, `#02`... in start order (the 12:00 AM and 1:20 AM matches close the previous day); admin-made matches take the next number of their day. Two digits, so at most 99 a day. Wherever a match is asked for, `#05` means the match 5 that starts closest to now.
+- **Kills.** Enter the match number (such as `#05`) and a player who joined it.
 - **Team numbers and winners.** Every team that joins a match gets the next number (#1, #2...), shown in Match control, on the user page and to the player. To declare the winner, enter the winning team's number in Match control (or the match ID and number under *Confirm winner*); their winnings go straight into their winning coins. Entries made before team numbers existed are numbered in the order they joined.
 - **Admin emails.** Removing an email from `ADMIN_EMAIL` removes its admin login on the next sign-in attempt.
 
