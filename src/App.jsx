@@ -14,10 +14,13 @@ const userDataStorageKey = "nexus-user-data";
 const emptyAuthForm = { username: "", email: "", phone: "", password: "", otp: "", loginMethod: "email" };
 const emailPattern = /^\S+@\S+\.\S+$/;
 
-// Every way of signing in stores the account the same way. The password (or, after Google sign-in,
-// the login secret the server handed out) authorises this device's wallet and match requests.
-function toAccount({ userKey, name, email, phone }, password) {
-  return { name, email: email || "", phone: phone || "", password, userKey, coins: 0, status: "active" };
+// Every way of signing in stores the account the same way. The server hands out a login secret,
+// kept in the password field, that authorises this device's wallet and match requests; the
+// player's real password is never stored.
+const loginSecretPattern = /^[0-9a-f]{64}$/;
+
+function toAccount({ userKey, name, email, phone }, loginSecret) {
+  return { name, email: email || "", phone: phone || "", password: loginSecret, userKey, coins: 0, status: "active" };
 }
 
 function readPendingPayment() {
@@ -545,7 +548,7 @@ function App() {
         password,
         sessionId: sessionId(),
       }));
-      if (result) completeAuth(toAccount(result.user, password));
+      if (result) completeAuth(toAccount(result.user, result.loginSecret));
       return;
     }
 
@@ -561,13 +564,13 @@ function App() {
     const verification = { email: email.trim(), otpToken: otpChallenge.otpToken, otp: form.otp.trim(), password, sessionId: sessionId() };
     if (authMode === "forgot") {
       const result = await runAuthRequest(() => postJson("/api/auth/password/reset", verification));
-      if (result) completeAuth(toAccount(result.user, password));
+      if (result) completeAuth(toAccount(result.user, result.loginSecret));
       return;
     }
     const result = await runAuthRequest(() => postJson("/api/users/register", { ...verification, displayName: username.trim() }));
     if (result) {
       const { user } = result;
-      completeAuth(toAccount({ userKey: user.user_key, name: user.display_name, email: user.email, phone: user.phone }, password));
+      completeAuth(toAccount({ userKey: user.user_key, name: user.display_name, email: user.email, phone: user.phone }, result.loginSecret));
     }
   };
 
@@ -587,6 +590,33 @@ function App() {
     setMatchDetails(null);
     setAuthOpen(false);
   };
+
+  // Browsers signed in before login secrets kept the password itself. Swap it once for the account's
+  // login secret, so the password is no longer stored on this device.
+  const upgradeStoredPassword = useEffectEvent(async (account) => {
+    let result;
+    try {
+      result = await postJson("/api/users/login", { login: getUserKey(account), password: account.password });
+    } catch (error) {
+      // A changed password means this device's sign-in is no longer valid.
+      if (error.status === 401) {
+        handleSignOut();
+        showNotice("Your password was changed. Please log in again.", "error");
+      }
+      return;
+    }
+    const userKey = getUserKey(account);
+    const nextPlayer = { ...account, password: result.loginSecret };
+    const nextUsers = registeredUsers.map((user) => (getUserKey(user) === userKey ? { ...user, password: result.loginSecret } : user));
+    localStorage.setItem("nexus-player", JSON.stringify(nextPlayer));
+    localStorage.setItem("nexus-registered-users", JSON.stringify(nextUsers));
+    setRegisteredUsers(nextUsers);
+    setPlayer(nextPlayer);
+  });
+
+  useEffect(() => {
+    if (player?.password && !loginSecretPattern.test(player.password)) upgradeStoredPassword(player);
+  }, [player]);
 
   // Saves the edited profile locally for this device (login list and gamer tags) once the server accepts it.
   const storeProfile = (profile) => {
