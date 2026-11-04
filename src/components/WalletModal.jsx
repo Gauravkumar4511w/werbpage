@@ -24,7 +24,7 @@ function WalletModal({ coins, creditCoins, winningCoins, withdrawableCoins, wall
 
   const submitProof = async (event) => {
     event.preventDefault()
-    if (submitting || secondsLeft <= 0 || manualUtr.trim().length < 6 || !screenshot) return
+    if (submitting || manualUtr.trim().length < 6 || !screenshot) return
     setSubmitting(true)
     const submitted = await onSubmitPaymentProof({ utr: manualUtr.trim(), screenshot })
     setSubmitting(false)
@@ -56,19 +56,18 @@ function WalletModal({ coins, creditCoins, winningCoins, withdrawableCoins, wall
                     <span>PAY {pendingPayment.amount.toLocaleString()} COINS · ₹{pendingPayment.amount.toLocaleString()}</span>
                     <strong className={secondsLeft < 60 ? 'is-urgent' : ''}>{secondsLeft > 0 ? `${String(Math.floor(secondsLeft / 60)).padStart(2, '0')}:${String(secondsLeft % 60).padStart(2, '0')}` : 'EXPIRED'}</strong>
                   </div>
-                  {pendingPayment.upiUrl && secondsLeft > 0 ? <img className="payment-qr" src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(pendingPayment.upiUrl)}`} alt="UPI payment QR code" /> : <div className="payment-qr-expired">QR expired<br />Start a new payment</div>}
+                  {pendingPayment.upiUrl && secondsLeft > 0 ? <img className="payment-qr" src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(pendingPayment.upiUrl)}`} alt="UPI payment QR code" /> : <div className="payment-qr-expired">QR expired<br />Already paid? Send the proof below</div>}
                   {pendingPayment.upiUrl && secondsLeft > 0 && <p className="payment-receiver">Paying to <strong>{new URL(pendingPayment.upiUrl).searchParams.get('pa')}</strong></p>}
                   {secondsLeft > 0 && <button className="payment-upi-button" type="button" onClick={onOpenUpiPayment}>Open UPI app <span>-&gt;</span></button>}
                 </div>
-                {secondsLeft > 0 && (
-                  <form className="coin-custom-form" onSubmit={submitProof}>
-                    <p>After paying, upload the payment screenshot and enter the UTR from your UPI app.</p>
-                    <label>Payment screenshot<input type="file" accept="image/*" onChange={(event) => setScreenshot(event.target.files?.[0] || null)} required /></label>
-                    <label>UTR / transaction ID<input value={manualUtr} onChange={(event) => setManualUtr(event.target.value)} placeholder="12-digit UTR" required /></label>
-                    <button className="auth-submit" type="submit" disabled={submitting}>{submitting ? 'Submitting...' : <>Submit payment proof <span>-&gt;</span></>}</button>
-                  </form>
-                )}
-                <button className="payment-cancel" type="button" onClick={() => { setScreenshot(null); onCancelPayment() }}>{secondsLeft > 0 ? 'Close QR · I don\'t want to pay now' : 'Choose a new amount'}</button>
+                {/* Proof stays open after the QR expires: a player who paid late still needs to claim the coins. */}
+                <form className="coin-custom-form" onSubmit={submitProof}>
+                  <p>{secondsLeft > 0 ? 'After paying, upload the payment screenshot and enter the UTR from your UPI app.' : `If you paid ₹${pendingPayment.amount.toLocaleString()} with this QR, upload the screenshot and UTR now. If not, choose a new amount.`}</p>
+                  <label>Payment screenshot<input type="file" accept="image/*" onChange={(event) => setScreenshot(event.target.files?.[0] || null)} required /></label>
+                  <label>UTR / transaction ID<input value={manualUtr} onChange={(event) => setManualUtr(event.target.value)} placeholder="12-digit UTR" required /></label>
+                  <button className="auth-submit" type="submit" disabled={submitting}>{submitting ? 'Submitting...' : <>Submit payment proof <span>-&gt;</span></>}</button>
+                </form>
+                <button className="payment-cancel" type="button" onClick={() => { setScreenshot(null); onCancelPayment() }}>{secondsLeft > 0 ? 'Close QR · I don\'t want to pay now' : 'I did not pay · Choose a new amount'}</button>
               </div>
             ) : (
               <>
@@ -102,8 +101,8 @@ function WalletModal({ coins, creditCoins, winningCoins, withdrawableCoins, wall
             <div className="payment-methods"><button className={withdrawMethod === 'upi' ? 'selected' : ''} type="button" onClick={() => setWithdrawMethod('upi')}>UPI</button><button className={withdrawMethod === 'bank' ? 'selected' : ''} type="button" onClick={() => setWithdrawMethod('bank')}>Bank transfer</button></div>
             <label>Winning coins to withdraw<input type="number" min="50" max={withdrawableCoins} step="1" value={withdrawAmount} onChange={(event) => setWithdrawAmount(event.target.value)} placeholder="50 to winning balance" required /></label>
             {withdrawMethod === 'upi' ? <div className="bank-fields"><label>UPI ID<input value={withdrawDetails.upiId} onChange={(event) => updateDetails('upiId', event.target.value)} placeholder="player@upi" required /></label><label>Name on UPI account<input value={withdrawDetails.upiName} onChange={(event) => updateDetails('upiName', event.target.value)} placeholder="As shown in your UPI app" maxLength={60} autoComplete="name" required /></label></div> : <div className="bank-fields"><label>Account holder name<input value={withdrawDetails.accountName} onChange={(event) => updateDetails('accountName', event.target.value)} placeholder="Full name" required /></label><label>Account number<input inputMode="numeric" value={withdrawDetails.accountNumber} onChange={(event) => updateDetails('accountNumber', event.target.value.replace(/\D/g, ''))} placeholder="9-18 digits" required /></label><label>IFSC code<input value={withdrawDetails.ifsc} onChange={(event) => updateDetails('ifsc', event.target.value.toUpperCase())} placeholder="ABCD0123456" required /></label></div>}
-            <label>UPI QR screenshot<input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setWithdrawalScreenshot(event.target.files?.[0] || null)} required /></label>
-            <p>Withdraw between 50 and {withdrawableCoins.toLocaleString()} winning coins. Purchased coins cannot be withdrawn.</p>
+            {withdrawMethod === 'upi' && <label>UPI QR screenshot<input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setWithdrawalScreenshot(event.target.files?.[0] || null)} required /></label>}
+            <p>{withdrawableCoins >= 50 ? `Withdraw between 50 and ${withdrawableCoins.toLocaleString()} winning coins.` : `You need at least 50 winning coins to withdraw (you have ${withdrawableCoins.toLocaleString()}). Win matches to earn them.`} Purchased coins cannot be withdrawn.</p>
             <button className="auth-submit" type="submit">Request withdrawal <span>-&gt;</span></button>
           </form>
         )}

@@ -1,4 +1,4 @@
-function Navbar({ menuOpen, setMenuOpen, player, setAuthOpen, onHome, onHistory, libraryOpen, tournamentsOpen, myMatchesOpen, onMyMatches, upcomingMatchCount, onTournaments, onCoinClick, coinBalance, onAdmin }) {
+function Navbar({ menuOpen, setMenuOpen, player, setAuthOpen, onHome, onHistory, libraryOpen, tournamentsOpen, myMatchesOpen, onMyMatches, upcomingMatchCount, onTournaments, onCoinClick, coinBalance, onAdmin, playerLevel = 1 }) {
   const closeMenu = () => setMenuOpen(false)
   const openWallet = () => { closeMenu(); onCoinClick() }
   const openAccount = () => { closeMenu(); setAuthOpen(true) }
@@ -36,7 +36,6 @@ function Navbar({ menuOpen, setMenuOpen, player, setAuthOpen, onHome, onHistory,
         <div className="nav-links">
           <a className={`nav-link${!libraryOpen && !tournamentsOpen && !myMatchesOpen ? ' active' : ''}`} href="#discover" onClick={onHome}>Discover</a>
           <a className={`nav-link${libraryOpen ? ' active' : ''}`} href="#library" onClick={onHistory}>History</a>
-          <a className="nav-link" href="#community" onClick={closeMenu}>Community</a>
           <a className={`nav-link${tournamentsOpen ? ' active' : ''}`} href="#tournaments" onClick={onTournaments}>Matches <span className="live-dot">LIVE</span></a>
           <a className={`nav-link${myMatchesOpen ? ' active' : ''}`} href="#my-matches" onClick={onMyMatches}>My Matches{upcomingMatchCount > 0 && <span className="my-matches-count" aria-label={`${upcomingMatchCount} upcoming`}>{upcomingMatchCount}</span>}</a>
         </div>
@@ -50,7 +49,7 @@ function Navbar({ menuOpen, setMenuOpen, player, setAuthOpen, onHome, onHistory,
           </button>
           <button className="profile-button" type="button" aria-label="Open account" onClick={openAccount}>
             <span className="avatar">{initials}</span>
-            <span className="profile-copy"><strong>{player ? player.name : 'ArenaCore'}</strong><small>{player ? 'LVL 01' : 'SIGN IN'}</small></span>
+            <span className="profile-copy"><strong>{player ? player.name : 'ArenaCore'}</strong><small>{player ? `LVL ${String(playerLevel).padStart(2, '0')}` : 'SIGN IN'}</small></span>
             <span className="chevron" aria-hidden="true"></span>
           </button>
         </div>

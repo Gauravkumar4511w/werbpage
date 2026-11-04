@@ -1,5 +1,5 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
-import freeFireMaxIcon from "./assets/image_10d29343.jpg";
+import freeFireMaxIcon from "./assets/hero-banner.jpg";
 import "./App.css";
 import AuthModal from "./components/AuthModal";
 import AdminPanel from "./components/AdminPanel";
@@ -10,12 +10,13 @@ import { countUpcomingMatches } from "./myMatches.js";
 import Navbar from "./components/Navbar";
 import TournamentSection from "./components/TournamentSection";
 import WalletModal from "./components/WalletModal";
-import { EDIT_LOCK_MS, getTeamSize } from "../lib/match-schedule.js";
+import { EDIT_LOCK_MS, formatMatchNo, getTeamSize } from "../lib/match-schedule.js";
 import { imageFileToDataUrl } from "./imageUpload.js";
 
 const userDataStorageKey = "nexus-user-data";
 const emptyAuthForm = { username: "", email: "", phone: "", password: "", otp: "", loginMethod: "email" };
 const emailPattern = /^\S+@\S+\.\S+$/;
+const PROOF_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 // Every way of signing in stores the account the same way. The server hands out a login secret,
 // kept in the password field, that authorises this device's wallet and match requests; the
@@ -30,7 +31,8 @@ function readPendingPayment() {
   try {
     const payment = JSON.parse(localStorage.getItem("nexus-pending-payment") || "null");
     const expiresAt = Number(payment?.expiresAt);
-    if (!payment?.upiUrl || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+    // The QR is payable for 5 minutes, but proof can be sent for a day: players often come back late.
+    if (!payment?.upiUrl || !Number.isFinite(expiresAt) || expiresAt + PROOF_WINDOW_MS <= Date.now()) {
       localStorage.removeItem("nexus-pending-payment");
       return null;
     }
@@ -77,11 +79,13 @@ function joinedMatchesFromServer(entries, previous) {
     const identifiers = entry.identifiers?.length ? entry.identifiers : local?.identifiers || [local?.identifier].filter(Boolean);
     return {
       id,
-      publicId: entry.publicId ? `#${entry.publicId}` : local?.publicId || "",
+      publicId: formatMatchNo(entry.dayNo) || (entry.publicId ? `#${entry.publicId}` : local?.publicId || ""),
       mode: entry.mode || local?.mode || "",
       matchTimestamp: Number(entry.matchTimestamp) || local?.matchTimestamp || 0,
       entryFee: Number(entry.entryFee) || local?.entryFee || 0,
       status: entry.status,
+      won: Boolean(entry.won),
+      teamNo: Number(entry.teamNo) || local?.teamNo || null,
       identifier: identifiers[0] || "",
       identifiers,
       roomId: entry.roomId || "",
@@ -181,17 +185,13 @@ function App() {
   const visibleJoinedMatches = player ? joinedMatches : [];
   const [joinConfirm, setJoinConfirm] = useState(null);
   const [matchDetails, setMatchDetails] = useState(null);
-  const [matchHistory] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem("nexus-match-history")) || [];
-    } catch {
-      return [];
-    }
-  });
+  // Wins are the joined matches the admin confirmed this player's team won; every 5 wins is a level.
+  // Tournaments counts only matches still to come: played ones drop out once they finish.
+  const wins = visibleJoinedMatches.filter((match) => match.won).length;
   const profileStats = {
-    level: Math.max(1, Math.floor(matchHistory.filter((match) => match.result === "Victory").length / 5) + 1),
-    wins: matchHistory.filter((match) => match.result === "Victory").length,
-    tournaments: joinedMatches.length,
+    level: Math.floor(wins / 5) + 1,
+    wins,
+    tournaments: countUpcomingMatches(visibleJoinedMatches, currentTime),
   };
   const [form, setForm] = useState(emptyAuthForm);
   // Set once the server has emailed a sign-up or password reset code: { otpToken, sentTo, resendAt, sentAt, devOtp? }.
@@ -336,8 +336,9 @@ function App() {
         } else if (rejected.length) {
           setWalletMessage(`Top-up with UTR ${rejected[0].utr} was rejected${rejected[0].review_note ? `: ${rejected[0].review_note}` : "."}`);
         }
-      } catch {
-        // Keep showing the last known balance while offline.
+      } catch (error) {
+        // A deactivated or missing account is signed out; otherwise keep the last balance while offline.
+        if (active && error.status === 403) onAccountRefused(error.message);
       }
     };
     syncWallet();
@@ -598,6 +599,11 @@ function App() {
     setAuthOpen(false);
   };
 
+  const onAccountRefused = useEffectEvent((message) => {
+    handleSignOut();
+    showNotice(message, "error");
+  });
+
   // Browsers signed in before login secrets kept the password itself. Swap it once for the account's
   // login secret, so the password is no longer stored on this device.
   const upgradeStoredPassword = useEffectEvent(async (account) => {
@@ -685,6 +691,7 @@ function App() {
 
   const openHome = (event) => {
     event.preventDefault();
+    if (window.location.hash !== "#discover") window.history.pushState({ view: "home" }, "", "#discover");
     setLibraryOpen(false);
     setMyMatchesOpen(false);
     setTournamentsOpen(false);
@@ -706,6 +713,7 @@ function App() {
   };
 
   const backToDiscover = () => {
+    if (window.location.hash !== "#discover") window.history.pushState({ view: "home" }, "", "#discover");
     setFocusMatchId(null);
     setLibraryOpen(false);
     setMyMatchesOpen(false);
@@ -715,16 +723,19 @@ function App() {
   };
 
   useEffect(() => {
+    // Back and forward show the page the URL names. #wallet and #profile are pop-ups over a page,
+    // so they only close the pop-up and leave that page as it is.
     const handleBrowserBack = () => {
+      const hash = window.location.hash;
       setFocusMatchId(null);
-      setLibraryOpen(false);
-      setMyMatchesOpen(window.location.hash === "#my-matches");
-    setMyMatchesOpen(false);
-      setTournamentsOpen(false);
-      setAdminOpen(window.location.hash === "#admin");
       setWalletOpen(false);
       setAuthOpen(false);
       setMenuOpen(false);
+      if (hash === "#wallet" || hash === "#profile") return;
+      setAdminOpen(hash === "#admin");
+      setTournamentsOpen(hash === "#tournaments");
+      setMyMatchesOpen(hash === "#my-matches");
+      setLibraryOpen(hash === "#library");
       window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
@@ -836,7 +847,7 @@ function App() {
       setWalletMessage("Enter the name on your UPI account, so the admin pays the right person.");
       return;
     }
-    if (!withdrawalScreenshot) {
+    if (withdrawMethod === "upi" && !withdrawalScreenshot) {
       setWalletMessage("Upload your UPI QR screenshot for withdrawal verification.");
       return;
     }
@@ -858,7 +869,7 @@ function App() {
         amount,
         method: withdrawMethod,
         details: withdrawDetails,
-        qrScreenshot: await imageFileToDataUrl(withdrawalScreenshot),
+        qrScreenshot: withdrawMethod === "upi" && withdrawalScreenshot ? await imageFileToDataUrl(withdrawalScreenshot) : undefined,
       });
       setPurchasedCoins(wallet.creditCoins);
       setWinningCoins(wallet.winningCoins);
@@ -917,12 +928,11 @@ function App() {
           setWalletOpen(false);
           setLibraryOpen(false);
           setMyMatchesOpen(false);
-      setMyMatchesOpen(false);
-    setMyMatchesOpen(false);
           setTournamentsOpen(false);
           setMenuOpen(false);
         }}
         coinBalance={visibleCoins}
+        playerLevel={profileStats.level}
       />
       {adminOpen ? (
         <AdminPanel onBack={() => { setAdminOpen(false); window.history.pushState({ view: "home" }, "", "#discover"); }} />
@@ -952,22 +962,19 @@ function App() {
       ) : libraryOpen ? (
         <LibrarySection
           libraryOpen={libraryOpen}
-          matchHistory={matchHistory}
           joinedMatches={visibleJoinedMatches}
-          onBack={() => setLibraryOpen(false)}
+          onBack={backToDiscover}
           onOpenJoinedMatch={(match) => {
             if (!requireLogin()) return;
+            window.history.pushState({ view: "matches" }, "", "#tournaments");
             setFocusMatchId(match.id);
             setLibraryOpen(false);
             setMyMatchesOpen(false);
-          setMyMatchesOpen(false);
-      setMyMatchesOpen(false);
-    setMyMatchesOpen(false);
             setTournamentsOpen(true);
           }}
         />
       ) : (
-        <HeroSection openTournaments={openTournaments} liveCount={liveCount} />
+        <HeroSection openTournaments={openTournaments} openMyMatches={openMyMatches} liveCount={liveCount} />
       )}
       <AuthModal
         authOpen={authOpen}
@@ -1083,7 +1090,7 @@ function App() {
 
                 {detailsEntry && (
                   <div className="match-player-list">
-                    <span className="match-player-list-title">Your team</span>
+                    <span className="match-player-list-title">Your team{detailsEntry.teamNo ? ` · #${detailsEntry.teamNo}` : ""}</span>
                     <div className="match-team-roster">
                       <span className="match-team-label">Joined</span>
                       <div>

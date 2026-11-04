@@ -1,4 +1,4 @@
-function HeroSection({ openTournaments, liveCount = 1 }) {
+function HeroSection({ openTournaments, openMyMatches, liveCount = 1 }) {
   const displayCount = Math.max(1, Number(liveCount) || 1)
   return (
     <section className="nav-showcase" id="top">
@@ -7,7 +7,7 @@ function HeroSection({ openTournaments, liveCount = 1 }) {
       <p className="showcase-copy">Discover worlds worth getting lost in, compete with the best, and make every session count.</p>
       <div className="showcase-actions">
         <a className="primary-cta" href="#tournaments" onClick={openTournaments}>Explore games <span aria-hidden="true">-&gt;</span></a>
-        <a className="secondary-cta" href="#trending">View trending</a>
+        <a className="secondary-cta" href="#my-matches" onClick={openMyMatches}>My matches</a>
       </div>
       <div className="status-bar"><span className="status-pulse"></span> {displayCount.toLocaleString()} players online <span className="status-divider"></span> Season 08 is live</div>
     </section>

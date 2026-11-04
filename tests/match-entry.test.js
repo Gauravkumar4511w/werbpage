@@ -145,6 +145,12 @@ test('re-registering a number cannot replace its password or undo a deactivation
   await request('/api/users/sync', { body: { users: [{ userKey: players[2].userKey, name: 'Player3', password: players[2].password, status: 'active' }, { userKey: players[0].userKey, password: 'stale' }] } })
   const detail = await request('/api/admin/users/detail', { method: 'GET', headers: admin, query: { userKey: players[2].userKey } })
   assert.equal(detail.data.user.status, 'inactive')
+
+  // A deactivated player can no longer log in, open the wallet or join matches.
+  assert.equal((await request('/api/users/login', { body: { login: players[2].userKey, password: players[2].password } })).status, 403)
+  assert.equal((await request('/api/users/wallet', { body: players[2] })).status, 403)
+  await request('/api/admin/users/status', { method: 'PATCH', headers: admin, body: { userKey: players[2].userKey, status: 'active' } })
+  assert.equal((await request('/api/users/wallet', { body: players[2] })).status, 200)
 })
 
 test('the default prize pool counts the teams that actually joined', async () => {
@@ -187,6 +193,8 @@ test('profile edits need the password, stay unique and keep a way to log in', as
   assert.equal((await change(players[0], { email: '', phone: '' })).status, 400)
   assert.equal((await change(players[0], { phone: '12' })).status, 400)
 
+  // two@gmail.com was only typed into a profile, never proven, so its real owner can still sign up.
   const signup = await signUp(request, { email: 'two@gmail.com', displayName: 'SomeoneElse', password: 'someone-else' })
-  assert.equal(signup.status, 409)
+  assert.equal(signup.status, 200, JSON.stringify(signup.data))
+  assert.equal(signup.data.user.user_key, 'two@gmail.com')
 })

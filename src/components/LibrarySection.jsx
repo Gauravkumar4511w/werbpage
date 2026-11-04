@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { matchState } from '../myMatches.js'
 
 const knownModes = ['Battle Royale Solo', 'Battle Royale Duo', 'Battle Royale Squad', 'Clash Squad 1v1', 'Clash Squad 2v2', 'Clash Squad 4v4', 'Lone Wolf 1v1']
 
@@ -20,7 +21,7 @@ function getMatchTimestamp(match) {
   return date.getTime()
 }
 
-function LibrarySection({ libraryOpen, matchHistory, joinedMatches, onBack, onOpenJoinedMatch }) {
+function LibrarySection({ libraryOpen, joinedMatches, onBack, onOpenJoinedMatch }) {
   const [currentTime, setCurrentTime] = useState(() => Date.now())
 
   useEffect(() => {
@@ -28,15 +29,17 @@ function LibrarySection({ libraryOpen, matchHistory, joinedMatches, onBack, onOp
     return () => window.clearInterval(refreshTimer)
   }, [])
 
-  const playedJoinedMatches = joinedMatches.filter((match) => getMatchTimestamp(match) > 0 && getMatchTimestamp(match) <= currentTime)
-  const upcomingJoinedMatches = joinedMatches.filter((match) => getMatchTimestamp(match) === 0 || getMatchTimestamp(match) > currentTime)
+  // Same grouping as My Matches: a match counts as played once its result is confirmed or it has ended.
+  const isPlayed = (match) => matchState({ ...match, matchTimestamp: getMatchTimestamp(match) }, currentTime).group === 'past'
+  const playedJoinedMatches = joinedMatches.filter(isPlayed)
+  const upcomingJoinedMatches = joinedMatches.filter((match) => !isPlayed(match))
 
   return (
     <section className={`library-section${libraryOpen ? ' is-visible' : ''}`} id="library" aria-labelledby="library-title">
       <button className="library-back" type="button" onClick={onBack}>&lt;- Back to discover</button>
       <div className="section-heading">
         <div><p className="eyebrow"><span></span> Your activity</p><h2 id="library-title">MATCH HISTORY.</h2></div>
-        <p>{playedJoinedMatches.length + matchHistory.length} played {playedJoinedMatches.length + matchHistory.length === 1 ? 'match' : 'matches'}</p>
+        <p>{playedJoinedMatches.length} played {playedJoinedMatches.length === 1 ? 'match' : 'matches'} · {playedJoinedMatches.filter((match) => match.won).length} won</p>
       </div>
       <div className="history-sections">
         {upcomingJoinedMatches.length > 0 && <div className="history-group">
@@ -52,24 +55,21 @@ function LibrarySection({ libraryOpen, matchHistory, joinedMatches, onBack, onOp
             ))}
           </div>
         </div>}
-        {(playedJoinedMatches.length > 0 || matchHistory.length > 0) && <div className="history-group">
+        {playedJoinedMatches.length > 0 && <div className="history-group">
           <h3 className="history-group-title">PLAYED MATCHES</h3>
           <div className="match-history-list">
             {playedJoinedMatches.map((match) => (
               <article className="match-history-row" key={`played-joined-${match.id}`}>
                 <div className="match-game-mark">FF</div>
-                <div><h3>{getMatchMode(match)}</h3><p>Free Fire MAX · Match completed</p></div>
-                <strong className="victory">PLAYED</strong>
+                <div><h3>{getMatchMode(match)}</h3><p>Free Fire MAX · {match.status === 'confirmed' ? 'Result confirmed' : 'Waiting for result'}</p></div>
+                <strong className={match.won || match.status !== 'confirmed' ? 'victory' : 'defeat'}>{match.won ? 'WON' : match.status === 'confirmed' ? 'PLAYED' : 'PENDING'}</strong>
                 <span>{match.identifier || 'Players confirmed'}</span>
               </article>
-            ))}
-            {matchHistory.map((match) => (
-              <article className="match-history-row" key={match.id}><div className="match-game-mark">FF</div><div><h3>{match.mode}</h3><p>Free Fire MAX · {match.date}</p></div><strong className={match.result === 'Victory' ? 'victory' : 'defeat'}>{match.result}</strong><span>{match.score}</span></article>
             ))}
           </div>
         </div>}
       </div>
-      {matchHistory.length === 0 && joinedMatches.length === 0 && <div className="empty-library"><strong>No matches yet.</strong><span>Your joined and played matches will appear here.</span></div>}
+      {joinedMatches.length === 0 && <div className="empty-library"><strong>No matches yet.</strong><span>Your joined and played matches will appear here.</span></div>}
     </section>
   )
 }
