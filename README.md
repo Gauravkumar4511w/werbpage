@@ -51,6 +51,12 @@ Admin sessions use signed tokens when `ADMIN_PASSWORD` is configured, so separat
 
 Deploy the repository, including `api/` and `vercel.json`, rather than only the `dist/` folder. Local SQLite files are excluded from serverless function bundles.
 
+## Passwords and login secrets
+
+- Player passwords are stored as scrypt hashes (`scrypt$salt$hash`). Start-up hashes any older row that still holds a password as typed.
+- Every sign-in (password, sign-up, reset or Google) returns the account's random login secret (`users.login_secret`). The browser keeps that instead of the password and sends it with wallet, match and profile requests, so the password is never stored on the device. A browser signed in before this change swaps its stored password for the secret on its next visit.
+- A password reset replaces the login secret, which signs the account out on every other device.
+
 ## Database
 
 Accounts, wallets and matches are stored in SQLite through `@libsql/client` (`lib/payout-db.js`).
@@ -94,7 +100,7 @@ Without a provider, `npm run dev` shows the code on screen so you can test. A de
 The **Continue with Google** button appears once `GOOGLE_CLIENT_ID` is set; the browser reads it from `/api/auth/config`, so no rebuild is needed. The server checks the Google ID token's signature against Google's public keys, its audience and its expiry before trusting the email (`lib/google-auth.js`).
 
 - A new email gets a new account, with a gamer tag made from the Google name. An existing account with that email is logged into.
-- Google sign-in never sends the account's password to the browser. It hands out a random login secret (`users.login_secret`) that the wallet and match requests accept in place of the password. A Google-only account can set a password with **Forgot password?**.
+- A Google-only account gets a random password nobody knows, and can set a real one with **Forgot password?**.
 
 To get a client ID: in console.cloud.google.com, open **APIs & Services → Credentials → Create credentials → OAuth client ID**, choose **Web application**, and add every site address under **Authorized JavaScript origins** (for example `https://ffarenacore.vercel.app` and `http://localhost:5173`).
 

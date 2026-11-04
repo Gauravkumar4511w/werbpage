@@ -90,7 +90,7 @@ test('codes expire after ten minutes', async () => {
   const details = { email: 'late@test.com', displayName: 'LatePlayer', password: 'secret123' }
   const sent = await db.requestSignupOtp(details, now)
   await assert.rejects(() => db.registerVerifiedUser({ ...details, otpToken: sent.otpToken, otp: sent.devOtp }, now + 10 * 60 * 1000 + 1), /expired/)
-  assert.equal((await db.registerVerifiedUser({ ...details, otpToken: sent.otpToken, otp: sent.devOtp }, now + 60 * 1000)).user_key, 'late@test.com')
+  assert.equal((await db.registerVerifiedUser({ ...details, otpToken: sent.otpToken, otp: sent.devOtp }, now + 60 * 1000)).user.user_key, 'late@test.com')
 })
 
 test('taken emails and gamer tags are refused before a code is sent', async () => {

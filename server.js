@@ -265,9 +265,9 @@ async function handleApiRequest(request, response) {
   if (request.method === 'POST' && pathname === '/api/auth/password/reset') {
     try {
       const body = await readBody(request)
-      const user = await resetPassword(body)
-      if (body.sessionId) await recordUserPresence({ sessionId: body.sessionId, userKey: user.userKey })
-      sendJson(response, 200, { user })
+      const result = await resetPassword(body)
+      if (body.sessionId) await recordUserPresence({ sessionId: body.sessionId, userKey: result.user.userKey })
+      sendJson(response, 200, result)
     } catch (error) {
       sendError(response, error, 'Could not reset the password.')
     }
@@ -287,11 +287,11 @@ async function handleApiRequest(request, response) {
   if (request.method === 'POST' && pathname === '/api/users/register') {
     try {
       const body = await readBody(request)
-      const user = await registerVerifiedUser(body)
+      const { user, loginSecret } = await registerVerifiedUser(body)
       if (body.sessionId) {
         await recordUserPresence({ sessionId: body.sessionId, userKey: user.user_key })
       }
-      sendJson(response, 200, { success: true, user })
+      sendJson(response, 200, { success: true, user, loginSecret })
     } catch (error) {
       sendError(response, error, 'Could not register user.')
     }
@@ -301,9 +301,9 @@ async function handleApiRequest(request, response) {
   if (request.method === 'POST' && pathname === '/api/users/login') {
     try {
       const body = await readBody(request)
-      const user = await loginUser(body)
-      if (body.sessionId) await recordUserPresence({ sessionId: body.sessionId, userKey: user.userKey })
-      sendJson(response, 200, { user })
+      const result = await loginUser(body)
+      if (body.sessionId) await recordUserPresence({ sessionId: body.sessionId, userKey: result.user.userKey })
+      sendJson(response, 200, result)
     } catch (error) {
       sendError(response, error, 'Could not log in.')
     }
