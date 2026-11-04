@@ -1,20 +1,59 @@
 import { useState } from 'react'
 import { formatDate, ledgerReasons, withdrawalDestination } from './adminFormat'
 import ScreenshotButton from './ScreenshotButton'
+import { matchState } from '../myMatches.js'
 
 const sections = [
+  ['matches', 'Joined matches'],
   ['wallet', 'Wallet history'],
   ['topups', 'Top-ups'],
   ['withdrawals', 'Withdrawals'],
-  ['matches', 'Matches'],
 ]
+
+// What happened in a joined match, as the admin needs it: still to come, or played and its result.
+function entryResult(row, now) {
+  const state = matchState({ matchTimestamp: Number(row.match_timestamp) || 0, status: row.status, roomId: row.room_id }, now)
+  if (row.status === 'confirmed') return { played: true, label: row.winner_team_key === row.team_key ? `Won${row.payout ? ` · +${Number(row.payout).toLocaleString()} coins` : ''}` : 'Lost' }
+  if (state.group === 'past') return { played: true, label: 'Played · waiting for result' }
+  return { played: false, label: state.label }
+}
+
+function JoinedMatchesTable({ title, rows, emptyText }) {
+  return (
+    <>
+      <h3 className="admin-detail-subheading">{title} ({rows.length})</h3>
+      <table>
+        <thead><tr><th>Match</th><th>Mode</th><th>Starts</th><th>Entry fee</th><th>In-game names</th><th>Kills</th><th>Status</th></tr></thead>
+        <tbody>
+          {rows.length ? rows.map(({ row, result }) => (
+            <tr key={row.match_id}>
+              <td>{row.public_id ? `#${row.public_id}` : row.match_id}</td>
+              <td>{row.mode || '-'}</td>
+              <td>{row.match_timestamp ? formatDate(Number(row.match_timestamp)) : '-'}</td>
+              <td>{row.entry_fee ?? '-'}</td>
+              <td>{row.identifiers?.length ? row.identifiers.join(', ') : '-'}</td>
+              <td>{row.kills ?? '-'}</td>
+              <td>{result.label}</td>
+            </tr>
+          )) : <tr><td colSpan="7">{emptyText}</td></tr>}
+        </tbody>
+      </table>
+    </>
+  )
+}
 
 function AdminUserDetail({ detail, busy, onAdjust, onSetStatus, onRefresh, onClose, onReviewPayment, onReviewWithdrawal, onViewUpload }) {
   const { user, totals, transactions, payments, withdrawals, entries } = detail
   const [form, setForm] = useState({ wallet: 'credit', amount: '', note: '' })
   const [formError, setFormError] = useState('')
-  const [section, setSection] = useState('wallet')
+  const [section, setSection] = useState('matches')
+  const [now] = useState(() => Date.now())
   const counts = { wallet: transactions.length, topups: payments.length, withdrawals: withdrawals.length, matches: entries.length }
+  const withResult = entries.map((row) => ({ row, result: entryResult(row, now) }))
+  // Upcoming soonest first; played newest first.
+  const upcoming = withResult.filter(({ result }) => !result.played).sort((a, b) => Number(a.row.match_timestamp || 0) - Number(b.row.match_timestamp || 0))
+  const played = withResult.filter(({ result }) => result.played)
+  const wins = played.filter(({ row }) => row.status === 'confirmed' && row.winner_team_key === row.team_key).length
 
   const submitAdjustment = async (direction) => {
     const amount = Number(form.amount)
@@ -73,6 +112,11 @@ function AdminUserDetail({ detail, busy, onAdjust, onSetStatus, onRefresh, onClo
             <div><span>Pending top-ups</span><strong>{totals.pendingTopups.toLocaleString()}</strong></div>
             <div><span>Total winnings</span><strong>{totals.totalWinnings.toLocaleString()}</strong></div>
             <div><span>Withdrawn</span><strong>{totals.withdrawn.toLocaleString()}</strong><small>{totals.pendingWithdrawals.toLocaleString()} pending</small></div>
+          </div>
+          <div className="admin-balance-grid is-muted">
+            <div><span>Upcoming matches</span><strong>{upcoming.length}</strong><small>Joined, not played yet</small></div>
+            <div><span>Played matches</span><strong>{played.length}</strong></div>
+            <div><span>Wins</span><strong>{wins}</strong></div>
           </div>
         </div>
 
@@ -161,20 +205,10 @@ function AdminUserDetail({ detail, busy, onAdjust, onSetStatus, onRefresh, onClo
           </table>
         )}
         {section === 'matches' && (
-          <table>
-            <thead><tr><th>Match</th><th>Mode</th><th>Entry fee</th><th>Starts</th><th>Status</th></tr></thead>
-            <tbody>
-              {entries.length ? entries.map((row) => (
-                <tr key={row.match_id}>
-                  <td>{row.public_id ? `#${row.public_id}` : row.match_id}</td>
-                  <td>{row.mode || '-'}</td>
-                  <td>{row.entry_fee ?? '-'}</td>
-                  <td>{row.match_timestamp ? formatDate(Number(row.match_timestamp)) : '-'}</td>
-                  <td>{row.status === 'confirmed' ? (row.winner_team_key === row.team_key ? 'Won' : 'Lost') : row.status || '-'}</td>
-                </tr>
-              )) : <tr><td colSpan="5">Has not joined any match.</td></tr>}
-            </tbody>
-          </table>
+          <>
+            <JoinedMatchesTable title="Upcoming" rows={upcoming} emptyText="No upcoming matches joined." />
+            <JoinedMatchesTable title="Played" rows={played} emptyText="Has not played any match yet." />
+          </>
         )}
       </div>
     </section>

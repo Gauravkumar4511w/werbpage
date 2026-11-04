@@ -189,7 +189,11 @@ function AdminPanel({ onBack }) {
       const data = await api(`/api/admin/users/detail?userKey=${encodeURIComponent(value)}`)
       setUserDetail(data)
       setUserLookup(data.user.user_key)
-      if (!quiet) setMessage(`Showing ${data.user.display_name || data.user.user_key}.`)
+      if (!quiet) {
+        setMessage(`Showing ${data.user.display_name || data.user.user_key}.`)
+        // The details open above the users list, so bring them into view after a tap further down.
+        window.setTimeout(() => document.querySelector('.admin-user-detail')?.scrollIntoView({ block: 'start' }), 50)
+      }
     } catch (error) {
       if (!quiet) setUserDetail(null)
       setMessage(error.message)
@@ -468,10 +472,12 @@ function AdminPanel({ onBack }) {
   const searchable = (value) => JSON.stringify(value).toLowerCase().includes(query.toLowerCase())
   const logout = () => { sessionStorage.removeItem('arenacore-admin-token'); setToken(''); setUserDetail(null) }
   const filteredUsers = overview.users.filter(searchable)
+  const joinedByUser = overview.entries.reduce((counts, entry) => counts.set(entry.user_key, (counts.get(entry.user_key) || 0) + 1), new Map())
   const usersDisplayRows = filteredUsers.map((item) => ({
     ...item,
     status: item.status || 'active',
     online: item.is_online ? 'Online' : 'Offline',
+    joined_matches: joinedByUser.get(item.user_key) || 0,
   }))
   const byPendingFirst = (a, b) => (a.status === 'pending' ? 0 : 1) - (b.status === 'pending' ? 0 : 1) || b.id - a.id
   const pendingPayments = overview.payments.filter((item) => item.status === 'pending')
@@ -600,7 +606,7 @@ function AdminPanel({ onBack }) {
       {tab === 'matches' && <>
         <section className="admin-card admin-create-match"><h2>Create new match</h2><p>Select any available mode, choose its time, and publish a custom prize.</p><form className="admin-create-form" onSubmit={submitCreateMatch}><label>Mode<select value={createForm.mode} onChange={(event) => setCreateForm({ ...createForm, mode: event.target.value, entryFee: String(defaultFees[event.target.value]) })}>{matchModes.map((mode) => <option key={mode} value={mode}>{mode}</option>)}</select></label><label>Entry fee<input type="number" min="1" value={createForm.entryFee} onChange={(event) => setCreateForm({ ...createForm, entryFee: event.target.value })} required /></label><label>Date and time<input type="datetime-local" value={createForm.matchTimestamp} onChange={(event) => setCreateForm({ ...createForm, matchTimestamp: event.target.value })} required /></label><label>Prize pool<input type="number" min="0" value={createForm.prizePool} onChange={(event) => setCreateForm({ ...createForm, prizePool: event.target.value })} placeholder="Optional" /></label><label>Description<textarea value={createForm.description} onChange={(event) => setCreateForm({ ...createForm, description: event.target.value })} placeholder="Per kill 20 Rs..." rows="3" /></label><button type="submit">Create match</button></form></section>
         <section className="admin-card admin-match-lookup"><h2>Match control</h2><p>Enter a public ID such as #000001 to inspect players and edit settings.</p><div className="admin-lookup-row"><input value={matchLookup} onChange={(event) => setMatchLookup(event.target.value)} placeholder="#000001" /><button type="button" onClick={() => selectMatch(matchLookup)}>Open match</button></div></section>
-        {currentSelectedMatch && <MatchControl match={currentSelectedMatch} entries={overview.entries.filter((entry) => entry.match_id === currentSelectedMatch.match_id)} kills={overview.kills.filter((item) => item.match_id === currentSelectedMatch.match_id)} form={matchForm} setForm={setMatchForm} onSubmit={submitMatchUpdate} onDelete={deleteSelectedMatch} />}
+        {currentSelectedMatch && <MatchControl match={currentSelectedMatch} entries={overview.entries.filter((entry) => entry.match_id === currentSelectedMatch.match_id)} kills={overview.kills.filter((item) => item.match_id === currentSelectedMatch.match_id)} form={matchForm} setForm={setMatchForm} onSubmit={submitMatchUpdate} onDelete={deleteSelectedMatch} onOpenUser={openUser} />}
         <DataTable title="Registered matches" columns={['public_id', 'mode', 'entry_fee', 'joined', 'starts', 'prize_pool', 'status', 'winner_team_key']} rows={filteredMatches} onRowClick={(row) => selectMatch(row.public_id || row.match_id)} />
       </>}
 
@@ -620,7 +626,7 @@ function AdminPanel({ onBack }) {
             onViewUpload={viewUpload}
           />
         )}
-        <DataTable title="User balances · click a row to open" columns={['user_key', 'display_name', 'status', 'online', 'credit_coins', 'winning_coins', 'created_at']} rows={usersDisplayRows} onRowClick={(row) => loadUser(row.user_key)} />
+        <DataTable title="Users · tap a row to see full details and joined matches" columns={['user_key', 'display_name', 'status', 'online', 'joined_matches', 'credit_coins', 'winning_coins', 'created_at']} rows={usersDisplayRows} onRowClick={(row) => loadUser(row.user_key)} />
       </>}
       {screenshot && (
         <div className="admin-shot-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setScreenshot(null)}>
@@ -699,8 +705,8 @@ function CopyButton({ value }) {
   )
 }
 
-function MatchControl({ match, entries, kills, form, setForm, onSubmit, onDelete }) {
-  return <section className="admin-match-control"><div className="admin-card-heading"><div><h2>#{match.public_id || '------'} · {match.mode || 'Match'}</h2><span>{match.status} · {entries.length} joined players</span></div><button className="admin-delete-button" type="button" onClick={onDelete}>Delete match</button></div><div className="admin-match-columns"><div><h3>Joined players</h3><div className="admin-player-list">{entries.length ? entries.map((entry) => <div key={`${entry.team_key}-${entry.user_key}`}><strong>{entry.team_key}</strong><span>{entry.identifiers?.length ? entry.identifiers.join(', ') : entry.user_key}</span><small>{kills.find((item) => item.user_key === entry.user_key)?.kills || 0} kills</small></div>) : <p>No players recorded.</p>}</div></div><form className="admin-match-form" onSubmit={onSubmit}><label>Entry fee<input type="number" min="1" value={form.entryFee} onChange={(event) => setForm({ ...form, entryFee: event.target.value })} required /></label><label>Match time<input type="datetime-local" value={form.matchTimestamp} onChange={(event) => setForm({ ...form, matchTimestamp: event.target.value })} /></label><label>Prize payout override<input type="number" min="0" value={form.prizePool} onChange={(event) => setForm({ ...form, prizePool: event.target.value })} placeholder="Default: 80% pool" /></label><label>Match description<textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Per kill 20 Rs... or Prize pool 40 Rs..." rows="4" /></label><label>Room ID<input value={form.roomId} onChange={(event) => setForm({ ...form, roomId: event.target.value })} placeholder="Shown to joined players 10 min before start" maxLength={40} /></label><label>Room password<input value={form.roomPassword} onChange={(event) => setForm({ ...form, roomPassword: event.target.value })} placeholder="Room password" maxLength={40} /></label><button type="submit">Save match changes</button></form></div></section>
+function MatchControl({ match, entries, kills, form, setForm, onSubmit, onDelete, onOpenUser }) {
+  return <section className="admin-match-control"><div className="admin-card-heading"><div><h2>#{match.public_id || '------'} · {match.mode || 'Match'}</h2><span>{match.status} · {entries.length} joined players</span></div><button className="admin-delete-button" type="button" onClick={onDelete}>Delete match</button></div><div className="admin-match-columns"><div><h3>Joined players</h3><div className="admin-player-list">{entries.length ? entries.map((entry) => <div key={`${entry.team_key}-${entry.user_key}`}><strong><button type="button" className="admin-user-link" onClick={() => onOpenUser(entry.user_key)}>{entry.team_key}</button></strong><span>{entry.identifiers?.length ? entry.identifiers.join(', ') : entry.user_key}</span><small>{kills.find((item) => item.user_key === entry.user_key)?.kills || 0} kills</small></div>) : <p>No players recorded.</p>}</div></div><form className="admin-match-form" onSubmit={onSubmit}><label>Entry fee<input type="number" min="1" value={form.entryFee} onChange={(event) => setForm({ ...form, entryFee: event.target.value })} required /></label><label>Match time<input type="datetime-local" value={form.matchTimestamp} onChange={(event) => setForm({ ...form, matchTimestamp: event.target.value })} /></label><label>Prize payout override<input type="number" min="0" value={form.prizePool} onChange={(event) => setForm({ ...form, prizePool: event.target.value })} placeholder="Default: 80% pool" /></label><label>Match description<textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Per kill 20 Rs... or Prize pool 40 Rs..." rows="4" /></label><label>Room ID<input value={form.roomId} onChange={(event) => setForm({ ...form, roomId: event.target.value })} placeholder="Shown to joined players 10 min before start" maxLength={40} /></label><label>Room password<input value={form.roomPassword} onChange={(event) => setForm({ ...form, roomPassword: event.target.value })} placeholder="Room password" maxLength={40} /></label><button type="submit">Save match changes</button></form></div></section>
 }
 
 function DataTable({ title, columns, rows, onRowClick }) {

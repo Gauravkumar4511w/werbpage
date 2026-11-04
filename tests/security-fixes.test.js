@@ -168,3 +168,28 @@ test('an email taken out of ADMIN_EMAIL can no longer log in', async () => {
     process.env.ADMIN_EMAIL = 'admin-test@example.com'
   }
 })
+
+test('the admin user page lists every joined match with names, kills and payout', async () => {
+  const player = await makePlayer('detail-player@test.com', 'DetailPlayer')
+  const rival = await makePlayer('detail-rival@test.com', 'DetailRival')
+  const create = async (hoursAhead) => (await request('/api/admin/matches/create', { headers: admin, body: { mode: 'Clash Squad 1v1', entryFee: 50, matchTimestamp: Date.now() + hoursAhead * hour } })).data.match
+  const played = await create(2)
+  const upcoming = await create(5)
+  for (const entrant of [player, rival]) await db.adjustUserBalance({ userKey: entrant.userKey, amount: 150 })
+  for (const [entrant, match, name] of [[player, played, 'DetailIGN'], [rival, played, 'RivalIGN'], [player, upcoming, 'DetailIGN']]) {
+    assert.equal((await request('/api/matches/entry', { body: { ...entrant, matchId: match.match_id, identifiers: [name] } })).status, 201)
+  }
+  await request('/api/admin/matches/kills', { headers: admin, body: { matchId: played.public_id, kills: [{ userKey: player.userKey, kills: 4 }] } })
+  await request('/api/admin/matches/confirm-result', { headers: admin, body: { matchId: played.match_id, winnerTeamKey: player.userKey } })
+
+  const detail = await request('/api/admin/users/detail', { method: 'GET', headers: admin, query: { userKey: player.userKey } })
+  assert.equal(detail.status, 200)
+  const byId = Object.fromEntries(detail.data.entries.map((entry) => [entry.match_id, entry]))
+  assert.equal(detail.data.entries.length, 2)
+  assert.deepEqual(byId[played.match_id].identifiers, ['DetailIGN'])
+  assert.equal(byId[played.match_id].kills, 4)
+  assert.equal(byId[played.match_id].payout, 80)
+  assert.equal(byId[played.match_id].winner_team_key, player.userKey)
+  assert.equal(byId[upcoming.match_id].status, 'open')
+  assert.equal(byId[upcoming.match_id].kills, null)
+})

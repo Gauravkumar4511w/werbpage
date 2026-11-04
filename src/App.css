@@ -911,7 +911,7 @@ body { background: #07111c; }
 
 .admin-user-lookup .admin-lookup-row { margin-top: 14px; }
 .admin-page > .admin-user-lookup { margin-bottom: 14px; }
-.admin-user-detail { margin-bottom: 14px; border: 1px solid rgba(247,216,137,.35); padding: 20px; background: rgba(12,18,26,.92); }
+.admin-user-detail { scroll-margin-top: 90px; margin-bottom: 14px; border: 1px solid rgba(247,216,137,.35); padding: 20px; background: rgba(12,18,26,.92); }
 .admin-user-detail .admin-card-heading { align-items: flex-start; flex-wrap: wrap; }
 .admin-user-detail h2 { margin: 0 0 8px; color: #f5f1eb; font-family: var(--heading); font-size: 28px; }
 .admin-user-detail .admin-card-heading > div > span { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
@@ -945,6 +945,8 @@ body { background: #07111c; }
 .admin-adjust-buttons .is-deduct:hover { color: #171216; background: #e98778; }
 .admin-form-error { margin: 0; color: #e98778; font-size: 11px; }
 .admin-subtabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.admin-detail-subheading { margin: 14px 0 8px; color: #f7d889; font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.admin-detail-subheading:first-child { margin-top: 0; }
 .admin-user-detail table { width: 100%; min-width: 620px; border-collapse: collapse; }
 .admin-user-detail th, .admin-user-detail td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,.08); color: #b9bec7; font-size: 10px; text-align: left; white-space: nowrap; }
 .admin-user-detail th { color: #ffad99; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }

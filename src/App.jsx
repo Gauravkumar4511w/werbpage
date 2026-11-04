@@ -185,11 +185,12 @@ function App() {
   const [joinConfirm, setJoinConfirm] = useState(null);
   const [matchDetails, setMatchDetails] = useState(null);
   // Wins are the joined matches the admin confirmed this player's team won; every 5 wins is a level.
+  // Tournaments counts only matches still to come: played ones drop out once they finish.
   const wins = visibleJoinedMatches.filter((match) => match.won).length;
   const profileStats = {
     level: Math.floor(wins / 5) + 1,
     wins,
-    tournaments: visibleJoinedMatches.length,
+    tournaments: countUpcomingMatches(visibleJoinedMatches, currentTime),
   };
   const [form, setForm] = useState(emptyAuthForm);
   // Set once the server has emailed a sign-up or password reset code: { otpToken, sentTo, resendAt, sentAt, devOtp? }.
