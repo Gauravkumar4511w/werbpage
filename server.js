@@ -38,6 +38,7 @@ import {
   getAuthorizedWallet,
   reviewPaymentRequest,
   reviewWithdrawalRequest,
+  getUpload,
 } from './lib/payout-db.js'
 
 try { process.loadEnvFile?.() } catch { /* Deployed environments may not have a local .env file. */ }
@@ -374,6 +375,17 @@ async function handleApiRequest(request, response) {
       sendJson(response, 200, await getAdminUserDetail(request.query?.userKey || urlObj.searchParams.get('userKey')))
     } catch (error) {
       sendError(response, error, 'Could not load the user.')
+    }
+    return
+  }
+
+  if (request.method === 'GET' && pathname === '/api/admin/uploads') {
+    if (!await requireAdmin(request, response)) return
+    try {
+      const query = request.query || Object.fromEntries(urlObj.searchParams)
+      sendJson(response, 200, await getUpload({ kind: query.kind, id: query.id }))
+    } catch (error) {
+      sendError(response, error, 'Could not load the screenshot.')
     }
     return
   }

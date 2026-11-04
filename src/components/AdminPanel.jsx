@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import AdminUserDetail, { ReviewButtons } from './AdminUserDetail'
 import { formatDate, timeAgo, withdrawalDestination } from './adminFormat'
+import ScreenshotButton from './ScreenshotButton'
 
 const emptyOverview = { users: [], matches: [], entries: [], payments: [], withdrawals: [], kills: [], notifications: [], unreadNotifications: 0 }
 const matchModes = ['Battle Royale Solo', 'Battle Royale Duo', 'Battle Royale Squad', 'Clash Squad 1v1', 'Clash Squad 2v2', 'Clash Squad 4v4', 'Lone Wolf 1v1']
@@ -60,6 +61,8 @@ function AdminPanel({ onBack }) {
   const [alertsOpen, setAlertsOpen] = useState(false)
   const [toasts, setToasts] = useState([])
   const [highlight, setHighlight] = useState(null)
+  // The screenshot open in the viewer: { title, dataUrl } once loaded, or { title, error }.
+  const [screenshot, setScreenshot] = useState(null)
   const [reviewFilter, setReviewFilter] = useState('pending')
   const [notificationPermission, setNotificationPermission] = useState(() => (typeof Notification === 'undefined' ? 'unsupported' : Notification.permission))
   const [userLookup, setUserLookup] = useState('')
@@ -269,6 +272,16 @@ function AdminPanel({ onBack }) {
       const data = await api('/api/admin/notifications/read', { method: 'POST', body: JSON.stringify(ids ? { ids } : {}) })
       setOverview((current) => ({ ...current, ...data }))
     } catch (error) { setMessage(error.message) }
+  }
+
+  const viewUpload = async (kind, id, title) => {
+    setScreenshot({ title })
+    try {
+      const data = await api(`/api/admin/uploads?kind=${kind}&id=${id}`)
+      setScreenshot({ title, dataUrl: data.dataUrl, uploadedAt: data.uploadedAt })
+    } catch (error) {
+      setScreenshot({ title, error: error.message })
+    }
   }
 
   const openNotification = (item) => {
@@ -559,7 +572,7 @@ function AdminPanel({ onBack }) {
       {message && <p className="admin-message" role="status">{message}</p>}
 
       {tab === 'overview' && <>
-        <PaymentReviewTable title="Top-ups waiting for verification" rows={pendingPayments} busy={busy} highlight={highlight} onReview={reviewPayment} onOpenUser={openUser} emptyText="No top-ups are waiting. New UTR submissions appear here and in Alerts." />
+        <PaymentReviewTable title="Top-ups waiting for verification" rows={pendingPayments} busy={busy} highlight={highlight} onReview={reviewPayment} onOpenUser={openUser} onViewUpload={viewUpload} emptyText="No top-ups are waiting. New UTR submissions appear here and in Alerts." />
         <div className="admin-grid">
           {userLookupCard}
           <section className="admin-card"><h2>Add active user</h2><p>Register a new active player directly into the database.</p><form onSubmit={submitCreateUser}><input placeholder="User email / phone" value={userForm.userKey} onChange={(event) => setUserForm({ ...userForm, userKey: event.target.value })} required /><input placeholder="Display name / Gamer tag" value={userForm.displayName} onChange={(event) => setUserForm({ ...userForm, displayName: event.target.value })} required /><input type="number" min="0" placeholder="Opening credit coins (optional)" value={userForm.creditCoins} onChange={(event) => setUserForm({ ...userForm, creditCoins: event.target.value })} /><button type="submit">Add active user</button></form></section>
@@ -575,8 +588,8 @@ function AdminPanel({ onBack }) {
           ))}
         </div>
       )}
-      {tab === 'payments' && <PaymentReviewTable title="Coin top-up requests" rows={filteredPayments} busy={busy} highlight={highlight} onReview={reviewPayment} onOpenUser={openUser} emptyText={reviewFilter === 'pending' ? 'No pending top-ups.' : 'No top-up requests found.'} />}
-      {tab === 'withdrawals' && <WithdrawalReviewTable rows={filteredWithdrawals} busy={busy} highlight={highlight} onReview={reviewWithdrawal} onOpenUser={openUser} />}
+      {tab === 'payments' && <PaymentReviewTable title="Coin top-up requests" rows={filteredPayments} busy={busy} highlight={highlight} onReview={reviewPayment} onOpenUser={openUser} onViewUpload={viewUpload} emptyText={reviewFilter === 'pending' ? 'No pending top-ups.' : 'No top-up requests found.'} />}
+      {tab === 'withdrawals' && <WithdrawalReviewTable rows={filteredWithdrawals} busy={busy} highlight={highlight} onReview={reviewWithdrawal} onOpenUser={openUser} onViewUpload={viewUpload} />}
 
       {tab === 'matches' && <>
         <section className="admin-card admin-create-match"><h2>Create new match</h2><p>Select any available mode, choose its time, and publish a custom prize.</p><form className="admin-create-form" onSubmit={submitCreateMatch}><label>Mode<select value={createForm.mode} onChange={(event) => setCreateForm({ ...createForm, mode: event.target.value, entryFee: String(defaultFees[event.target.value]) })}>{matchModes.map((mode) => <option key={mode} value={mode}>{mode}</option>)}</select></label><label>Entry fee<input type="number" min="1" value={createForm.entryFee} onChange={(event) => setCreateForm({ ...createForm, entryFee: event.target.value })} required /></label><label>Date and time<input type="datetime-local" value={createForm.matchTimestamp} onChange={(event) => setCreateForm({ ...createForm, matchTimestamp: event.target.value })} required /></label><label>Prize pool<input type="number" min="0" value={createForm.prizePool} onChange={(event) => setCreateForm({ ...createForm, prizePool: event.target.value })} placeholder="Optional" /></label><label>Description<textarea value={createForm.description} onChange={(event) => setCreateForm({ ...createForm, description: event.target.value })} placeholder="Per kill 20 Rs..." rows="3" /></label><button type="submit">Create match</button></form></section>
@@ -598,21 +611,30 @@ function AdminPanel({ onBack }) {
             onClose={() => setUserDetail(null)}
             onReviewPayment={reviewPayment}
             onReviewWithdrawal={reviewWithdrawal}
+            onViewUpload={viewUpload}
           />
         )}
         <DataTable title="User balances · click a row to open" columns={['user_key', 'display_name', 'status', 'online', 'credit_coins', 'winning_coins', 'created_at']} rows={usersDisplayRows} onRowClick={(row) => loadUser(row.user_key)} />
       </>}
+      {screenshot && (
+        <div className="admin-shot-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setScreenshot(null)}>
+          <figure className="admin-shot" role="dialog" aria-modal="true" aria-label={screenshot.title}>
+            <figcaption><span>{screenshot.title}{screenshot.uploadedAt && <small>Uploaded {formatDate(screenshot.uploadedAt)}</small>}</span><button type="button" onClick={() => setScreenshot(null)}>Close</button></figcaption>
+            {screenshot.dataUrl ? <img src={screenshot.dataUrl} alt={screenshot.title} /> : <p>{screenshot.error || 'Loading screenshot...'}</p>}
+          </figure>
+        </div>
+      )}
     </main>
   )
 }
 
-function PaymentReviewTable({ title, rows, busy, highlight, onReview, onOpenUser, emptyText }) {
+function PaymentReviewTable({ title, rows, busy, highlight, onReview, onOpenUser, onViewUpload, emptyText }) {
   return (
     <section className="admin-table-card admin-review-card">
       <div className="admin-card-heading"><h2>{title}</h2><span>{rows.length} records</span></div>
       <div className="admin-table-wrap">
         <table>
-          <thead><tr><th>ID</th><th>User</th><th>Coins</th><th>Paid ₹</th><th>UTR</th><th>Status</th><th>Submitted</th><th>Action</th></tr></thead>
+          <thead><tr><th>ID</th><th>User</th><th>Coins</th><th>Paid ₹</th><th>UTR</th><th>Proof</th><th>Status</th><th>Submitted</th><th>Action</th></tr></thead>
           <tbody>
             {rows.length ? rows.map((row) => (
               <tr key={row.id} id={`payment-${row.id}`} className={highlight?.type === 'payment' && highlight.id === row.id ? 'is-highlighted' : ''}>
@@ -621,11 +643,12 @@ function PaymentReviewTable({ title, rows, busy, highlight, onReview, onOpenUser
                 <td>{row.coins.toLocaleString()}</td>
                 <td>{row.amount.toLocaleString()}</td>
                 <td><code className="admin-utr">{row.utr || '-'}</code>{row.utr && <CopyButton value={row.utr} />}</td>
+                <td><ScreenshotButton show={row.has_screenshot} onView={() => onViewUpload('payment', row.id, `Top-up #${row.id} · UTR ${row.utr} · ${row.user_key}`)} /></td>
                 <td><span className={`admin-status is-${row.status}`} title={row.review_note || undefined}>{row.status}</span></td>
                 <td>{formatDate(row.created_at)}</td>
                 <td>{row.status === 'pending' ? <ReviewButtons busy={busy} onApprove={() => onReview(row, 'approve')} onReject={() => onReview(row, 'reject')} /> : <small>{formatDate(row.reviewed_at)}{row.review_note ? ` · ${row.review_note}` : ''}</small>}</td>
               </tr>
-            )) : <tr><td colSpan="8">{emptyText}</td></tr>}
+            )) : <tr><td colSpan="9">{emptyText}</td></tr>}
           </tbody>
         </table>
       </div>
@@ -633,13 +656,13 @@ function PaymentReviewTable({ title, rows, busy, highlight, onReview, onOpenUser
   )
 }
 
-function WithdrawalReviewTable({ rows, busy, highlight, onReview, onOpenUser }) {
+function WithdrawalReviewTable({ rows, busy, highlight, onReview, onOpenUser, onViewUpload }) {
   return (
     <section className="admin-table-card admin-review-card">
       <div className="admin-card-heading"><h2>Withdrawal requests</h2><span>{rows.length} records</span></div>
       <div className="admin-table-wrap">
         <table>
-          <thead><tr><th>ID</th><th>User</th><th>Coins</th><th>Method</th><th>Pay to</th><th>Status</th><th>Requested</th><th>Action</th></tr></thead>
+          <thead><tr><th>ID</th><th>User</th><th>Coins</th><th>Method</th><th>Pay to</th><th>QR</th><th>Status</th><th>Requested</th><th>Action</th></tr></thead>
           <tbody>
             {rows.length ? rows.map((row) => (
               <tr key={row.id} id={`withdrawal-${row.id}`} className={highlight?.type === 'withdrawal' && highlight.id === row.id ? 'is-highlighted' : ''}>
@@ -648,11 +671,12 @@ function WithdrawalReviewTable({ rows, busy, highlight, onReview, onOpenUser }) 
                 <td>{row.amount.toLocaleString()}</td>
                 <td>{row.method.toUpperCase()}</td>
                 <td><code className="admin-utr">{withdrawalDestination(row)}</code></td>
+                <td><ScreenshotButton show={row.has_screenshot} onView={() => onViewUpload('withdrawal', row.id, `Withdrawal #${row.id} · ${withdrawalDestination(row)}`)} /></td>
                 <td><span className={`admin-status is-${row.status}`} title={row.review_note || undefined}>{row.status}</span></td>
                 <td>{formatDate(row.created_at)}</td>
                 <td>{row.status === 'pending' ? <ReviewButtons busy={busy} approveLabel="Mark paid" onApprove={() => onReview(row, 'approve')} onReject={() => onReview(row, 'reject')} /> : <small>{formatDate(row.reviewed_at)}{row.review_note ? ` · ${row.review_note}` : ''}</small>}</td>
               </tr>
-            )) : <tr><td colSpan="8">No withdrawal requests found.</td></tr>}
+            )) : <tr><td colSpan="9">No withdrawal requests found.</td></tr>}
           </tbody>
         </table>
       </div>

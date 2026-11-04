@@ -28,7 +28,7 @@ export function withdrawalDestination(row) {
     try { details = JSON.parse(details) } catch { details = {} }
   }
   if (!details) return '-'
-  if (row.method === 'upi') return details.upiId || '-'
+  if (row.method === 'upi') return [details.upiName, details.upiId].filter(Boolean).join(' · ') || '-'
   return [details.accountName, details.accountNumber, details.ifsc].filter(Boolean).join(' · ') || '-'
 }
 

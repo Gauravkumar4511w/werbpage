@@ -141,12 +141,13 @@ test('joining a match charges the stored fee once, and deleting the match refund
 })
 
 test('withdrawals hold winning coins, notify the admin and refund on rejection', async () => {
-  const requested = await request('/api/withdrawals/request', { body: { ...player, amount: 100, method: 'upi', details: { upiId: 'p@upi' } } })
+  const requested = await request('/api/withdrawals/request', { body: { ...player, amount: 100, method: 'upi', details: { upiId: 'p@upi', upiName: 'Wallet Player' } } })
   assert.equal(requested.status, 201)
   assert.equal(requested.data.wallet.winningCoins, 200)
 
-  const tooMuch = await request('/api/withdrawals/request', { body: { ...player, amount: 5000, method: 'upi' } })
+  const tooMuch = await request('/api/withdrawals/request', { body: { ...player, amount: 5000, method: 'upi', details: { upiId: 'p@upi', upiName: 'Wallet Player' } } })
   assert.equal(tooMuch.status, 400)
+  assert.match(tooMuch.data.message, /Not enough winning coins/)
 
   const notifications = await request('/api/admin/notifications', { method: 'GET', headers: admin })
   assert.ok(notifications.data.notifications.some((item) => item.type === 'withdrawal' && item.reference_id === requested.data.id))

@@ -20,7 +20,7 @@ function WalletModal({ coins, creditCoins, winningCoins, withdrawableCoins, wall
     event.preventDefault()
     if (submitting || secondsLeft <= 0 || manualUtr.trim().length < 6 || !screenshot) return
     setSubmitting(true)
-    const submitted = await onSubmitPaymentProof({ utr: manualUtr.trim(), screenshotName: screenshot.name })
+    const submitted = await onSubmitPaymentProof({ utr: manualUtr.trim(), screenshot })
     setSubmitting(false)
     if (submitted) setScreenshot(null)
   }
@@ -83,7 +83,7 @@ function WalletModal({ coins, creditCoins, winningCoins, withdrawableCoins, wall
             </div>
             <div className="payment-methods"><button className={withdrawMethod === 'upi' ? 'selected' : ''} type="button" onClick={() => setWithdrawMethod('upi')}>UPI</button><button className={withdrawMethod === 'bank' ? 'selected' : ''} type="button" onClick={() => setWithdrawMethod('bank')}>Bank transfer</button></div>
             <label>Winning coins to withdraw<input type="number" min="50" max={withdrawableCoins} step="1" value={withdrawAmount} onChange={(event) => setWithdrawAmount(event.target.value)} placeholder="50 to winning balance" required /></label>
-            {withdrawMethod === 'upi' ? <label>UPI ID<input value={withdrawDetails.upiId} onChange={(event) => updateDetails('upiId', event.target.value)} placeholder="player@upi" required /></label> : <div className="bank-fields"><label>Account holder name<input value={withdrawDetails.accountName} onChange={(event) => updateDetails('accountName', event.target.value)} placeholder="Full name" required /></label><label>Account number<input inputMode="numeric" value={withdrawDetails.accountNumber} onChange={(event) => updateDetails('accountNumber', event.target.value.replace(/\D/g, ''))} placeholder="9-18 digits" required /></label><label>IFSC code<input value={withdrawDetails.ifsc} onChange={(event) => updateDetails('ifsc', event.target.value.toUpperCase())} placeholder="ABCD0123456" required /></label></div>}
+            {withdrawMethod === 'upi' ? <div className="bank-fields"><label>UPI ID<input value={withdrawDetails.upiId} onChange={(event) => updateDetails('upiId', event.target.value)} placeholder="player@upi" required /></label><label>Name on UPI account<input value={withdrawDetails.upiName} onChange={(event) => updateDetails('upiName', event.target.value)} placeholder="As shown in your UPI app" maxLength={60} autoComplete="name" required /></label></div> : <div className="bank-fields"><label>Account holder name<input value={withdrawDetails.accountName} onChange={(event) => updateDetails('accountName', event.target.value)} placeholder="Full name" required /></label><label>Account number<input inputMode="numeric" value={withdrawDetails.accountNumber} onChange={(event) => updateDetails('accountNumber', event.target.value.replace(/\D/g, ''))} placeholder="9-18 digits" required /></label><label>IFSC code<input value={withdrawDetails.ifsc} onChange={(event) => updateDetails('ifsc', event.target.value.toUpperCase())} placeholder="ABCD0123456" required /></label></div>}
             <label>UPI QR screenshot<input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setWithdrawalScreenshot(event.target.files?.[0] || null)} required /></label>
             <p>Withdraw between 50 and {withdrawableCoins.toLocaleString()} winning coins. Purchased coins cannot be withdrawn.</p>
             <button className="auth-submit" type="submit">Request withdrawal <span>-&gt;</span></button>
