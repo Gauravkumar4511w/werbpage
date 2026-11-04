@@ -89,8 +89,8 @@ test('codes expire after ten minutes', async () => {
   const now = Date.now()
   const details = { email: 'late@test.com', displayName: 'LatePlayer', password: 'secret123' }
   const sent = await db.requestSignupOtp(details, now)
-  assert.throws(() => db.registerVerifiedUser({ ...details, otpToken: sent.otpToken, otp: sent.devOtp }, now + 10 * 60 * 1000 + 1), /expired/)
-  assert.equal(db.registerVerifiedUser({ ...details, otpToken: sent.otpToken, otp: sent.devOtp }, now + 60 * 1000).user_key, 'late@test.com')
+  await assert.rejects(() => db.registerVerifiedUser({ ...details, otpToken: sent.otpToken, otp: sent.devOtp }, now + 10 * 60 * 1000 + 1), /expired/)
+  assert.equal((await db.registerVerifiedUser({ ...details, otpToken: sent.otpToken, otp: sent.devOtp }, now + 60 * 1000)).user_key, 'late@test.com')
 })
 
 test('taken emails and gamer tags are refused before a code is sent', async () => {
@@ -111,7 +111,7 @@ test('a verified sign-up claims an account that only a browser re-sync created',
 })
 
 test('a forgotten password is reset with a code emailed to the account', async () => {
-  makeAccount('forgetful@test.com', 'Forgetful', 'old-password')
+  await makeAccount('forgetful@test.com', 'Forgetful', 'old-password')
   assert.equal((await forgot('nobody@test.com')).status, 404)
   assert.equal((await forgot('bad-email')).status, 400)
 
@@ -132,7 +132,7 @@ test('a forgotten password is reset with a code emailed to the account', async (
 })
 
 test('a sign-up code cannot reset a password, and a reset code cannot sign up', async () => {
-  makeAccount('mixed@test.com', 'MixedUp', 'secret123')
+  await makeAccount('mixed@test.com', 'MixedUp', 'secret123')
   const signupCode = await send({ email: 'mixed-new@test.com', displayName: 'MixedNew' })
   assert.equal((await reset({ email: 'mixed-new@test.com', otpToken: signupCode.data.otpToken, otp: signupCode.data.devOtp, password: 'hijacked' })).status, 400)
 
@@ -143,7 +143,7 @@ test('a sign-up code cannot reset a password, and a reset code cannot sign up', 
 })
 
 test('mobile-number accounts with an email can reset by email', async () => {
-  db.registerOrUpdateUser({ userKey: '+91 98888 11111', displayName: 'PhoneUser', phone: '+91 98888 11111', email: 'phone-user@test.com', password: 'old-password' }, { trusted: true })
+  await db.registerOrUpdateUser({ userKey: '+91 98888 11111', displayName: 'PhoneUser', phone: '+91 98888 11111', email: 'phone-user@test.com', password: 'old-password' }, { trusted: true })
   const sent = await forgot('phone-user@test.com')
   const done = await reset({ email: 'phone-user@test.com', otpToken: sent.data.otpToken, otp: sent.data.devOtp, password: 'new-password' })
   assert.equal(done.data.user.userKey, '+91 98888 11111')
@@ -243,7 +243,7 @@ test('Google sign-in rejects forged, expired and foreign tokens', async () => {
 })
 
 test('Google sign-in logs into an email account without revealing its password', async () => {
-  makeAccount('both@gmail.com', 'BothWays', 'my-own-password')
+  await makeAccount('both@gmail.com', 'BothWays', 'my-own-password')
   await withGoogle(async () => {
     const result = await google(googleToken({ email: 'both@gmail.com', sub: '42' }))
     assert.equal(result.data.created, false)

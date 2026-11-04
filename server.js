@@ -98,10 +98,10 @@ function getAdminToken(request) {
   return authorization.startsWith('Bearer ') ? authorization.slice(7) : ''
 }
 
-function requireAdmin(request, response) {
+async function requireAdmin(request, response) {
   const token = getAdminToken(request)
-  if (!token || !verifyAdminSession(token)) {
-    if (token) deleteAdminSession(token)
+  if (!token || !await verifyAdminSession(token)) {
+    if (token) await deleteAdminSession(token)
     sendJson(response, 401, { message: 'Admin authentication required.' })
     return false
   }
@@ -145,11 +145,11 @@ async function handleApiRequest(request, response) {
   if (request.method === 'POST' && pathname === '/api/admin/login') {
     try {
       const body = await readBody(request)
-      if (!authenticateAdmin(body.email, body.password)) {
+      if (!await authenticateAdmin(body.email, body.password)) {
         sendJson(response, 401, { message: 'Invalid admin credentials.' })
         return
       }
-      const session = createAdminSession()
+      const session = await createAdminSession()
       sendJson(response, 200, session)
     } catch (error) {
       sendJson(response, 400, { message: error instanceof Error ? error.message : 'Invalid request.' })
@@ -158,9 +158,9 @@ async function handleApiRequest(request, response) {
   }
 
   if (request.method === 'POST' && pathname === '/api/admin/matches/register') {
-    if (!requireAdmin(request, response)) return
+    if (!await requireAdmin(request, response)) return
     try {
-      registerMatch(await readBody(request))
+      await registerMatch(await readBody(request))
       sendJson(response, 201, { registered: true })
     } catch (error) {
       sendJson(response, 400, { message: error instanceof Error ? error.message : 'Could not register match.' })
@@ -169,9 +169,9 @@ async function handleApiRequest(request, response) {
   }
 
   if (request.method === 'POST' && pathname === '/api/admin/matches/confirm-result') {
-    if (!requireAdmin(request, response)) return
+    if (!await requireAdmin(request, response)) return
     try {
-      const payout = confirmMatchResult(await readBody(request))
+      const payout = await confirmMatchResult(await readBody(request))
       sendJson(response, 200, { confirmed: true, payout })
     } catch (error) {
       sendJson(response, 400, { message: error instanceof Error ? error.message : 'Could not confirm match result.' })
@@ -180,9 +180,9 @@ async function handleApiRequest(request, response) {
   }
 
   if (request.method === 'PATCH' && pathname === '/api/admin/matches/update') {
-    if (!requireAdmin(request, response)) return
+    if (!await requireAdmin(request, response)) return
     try {
-      sendJson(response, 200, { match: updateMatchDetails(await readBody(request)) })
+      sendJson(response, 200, { match: await updateMatchDetails(await readBody(request)) })
     } catch (error) {
       sendJson(response, 400, { message: error instanceof Error ? error.message : 'Could not update match.' })
     }
@@ -190,9 +190,9 @@ async function handleApiRequest(request, response) {
   }
 
   if (request.method === 'POST' && pathname === '/api/admin/matches/create') {
-    if (!requireAdmin(request, response)) return
+    if (!await requireAdmin(request, response)) return
     try {
-      sendJson(response, 201, { match: createAdminMatch(await readBody(request)) })
+      sendJson(response, 201, { match: await createAdminMatch(await readBody(request)) })
     } catch (error) {
       sendJson(response, 400, { message: error instanceof Error ? error.message : 'Could not create match.' })
     }
@@ -200,9 +200,9 @@ async function handleApiRequest(request, response) {
   }
 
   if (request.method === 'DELETE' && pathname === '/api/admin/matches/delete') {
-    if (!requireAdmin(request, response)) return
+    if (!await requireAdmin(request, response)) return
     try {
-      sendJson(response, 200, deleteAdminMatch((await readBody(request)).matchId))
+      sendJson(response, 200, await deleteAdminMatch((await readBody(request)).matchId))
     } catch (error) {
       sendJson(response, 400, { message: error instanceof Error ? error.message : 'Could not delete match.' })
     }
@@ -210,20 +210,20 @@ async function handleApiRequest(request, response) {
   }
 
   if (request.method === 'GET' && pathname === '/api/admin/overview') {
-    if (!requireAdmin(request, response)) return
-    sendJson(response, 200, getAdminOverview())
+    if (!await requireAdmin(request, response)) return
+    sendJson(response, 200, await getAdminOverview())
     return
   }
 
   if (request.method === 'GET' && (pathname === '/api/presence/stats' || pathname === '/api/presence/live-count')) {
-    sendJson(response, 200, getLiveStats())
+    sendJson(response, 200, await getLiveStats())
     return
   }
 
   if (request.method === 'POST' && pathname === '/api/presence/heartbeat') {
     try {
       const body = await readBody(request)
-      const stats = recordUserPresence({
+      const stats = await recordUserPresence({
         sessionId: body.sessionId,
         userKey: body.userKey,
         ip: request.headers?.['x-forwarded-for'] || request.socket?.remoteAddress || '',
@@ -245,7 +245,7 @@ async function handleApiRequest(request, response) {
     try {
       const body = await readBody(request)
       const result = await loginWithGoogle(body)
-      if (body.sessionId) recordUserPresence({ sessionId: body.sessionId, userKey: result.user.userKey })
+      if (body.sessionId) await recordUserPresence({ sessionId: body.sessionId, userKey: result.user.userKey })
       sendJson(response, 200, result)
     } catch (error) {
       sendError(response, error, 'Could not sign in with Google.')
@@ -265,8 +265,8 @@ async function handleApiRequest(request, response) {
   if (request.method === 'POST' && pathname === '/api/auth/password/reset') {
     try {
       const body = await readBody(request)
-      const user = resetPassword(body)
-      if (body.sessionId) recordUserPresence({ sessionId: body.sessionId, userKey: user.userKey })
+      const user = await resetPassword(body)
+      if (body.sessionId) await recordUserPresence({ sessionId: body.sessionId, userKey: user.userKey })
       sendJson(response, 200, { user })
     } catch (error) {
       sendError(response, error, 'Could not reset the password.')
@@ -283,13 +283,13 @@ async function handleApiRequest(request, response) {
     return
   }
 
-  // New players must send the code from /api/auth/otp/send; see registerVerifiedUser().
+  // New players must send the code from /api/auth/otp/send; see await registerVerifiedUser().
   if (request.method === 'POST' && pathname === '/api/users/register') {
     try {
       const body = await readBody(request)
-      const user = registerVerifiedUser(body)
+      const user = await registerVerifiedUser(body)
       if (body.sessionId) {
-        recordUserPresence({ sessionId: body.sessionId, userKey: user.user_key })
+        await recordUserPresence({ sessionId: body.sessionId, userKey: user.user_key })
       }
       sendJson(response, 200, { success: true, user })
     } catch (error) {
@@ -301,8 +301,8 @@ async function handleApiRequest(request, response) {
   if (request.method === 'POST' && pathname === '/api/users/login') {
     try {
       const body = await readBody(request)
-      const user = loginUser(body)
-      if (body.sessionId) recordUserPresence({ sessionId: body.sessionId, userKey: user.userKey })
+      const user = await loginUser(body)
+      if (body.sessionId) await recordUserPresence({ sessionId: body.sessionId, userKey: user.userKey })
       sendJson(response, 200, { user })
     } catch (error) {
       sendError(response, error, 'Could not log in.')
@@ -312,7 +312,7 @@ async function handleApiRequest(request, response) {
 
   if (request.method === 'POST' && pathname === '/api/users/profile') {
     try {
-      sendJson(response, 200, { user: updateUserProfile(await readBody(request)) })
+      sendJson(response, 200, { user: await updateUserProfile(await readBody(request)) })
     } catch (error) {
       sendError(response, error, 'Could not save your profile.')
     }
@@ -322,7 +322,7 @@ async function handleApiRequest(request, response) {
   if (request.method === 'POST' && pathname === '/api/users/sync') {
     try {
       const body = await readBody(request)
-      const users = syncUsers(body.users)
+      const users = await syncUsers(body.users)
       sendJson(response, 200, { success: true, count: users.length })
     } catch (error) {
       sendJson(response, 400, { message: error instanceof Error ? error.message : 'Could not sync users.' })
@@ -331,13 +331,13 @@ async function handleApiRequest(request, response) {
   }
 
   if (request.method === 'POST' && pathname === '/api/admin/users/create') {
-    if (!requireAdmin(request, response)) return
+    if (!await requireAdmin(request, response)) return
     try {
       const body = await readBody(request)
-      let user = registerOrUpdateUser({ ...body, status: 'active' }, { trusted: true })
+      let user = await registerOrUpdateUser({ ...body, status: 'active' }, { trusted: true })
       const openingCoins = Number(body.creditCoins) || 0
       if (openingCoins > 0) {
-        user = adjustUserBalance({ userKey: user.user_key, amount: openingCoins, wallet: 'credit', note: 'Opening balance' })
+        user = await adjustUserBalance({ userKey: user.user_key, amount: openingCoins, wallet: 'credit', note: 'Opening balance' })
       }
       sendJson(response, 201, { success: true, user })
     } catch (error) {
@@ -347,10 +347,10 @@ async function handleApiRequest(request, response) {
   }
 
   if (request.method === 'PATCH' && pathname === '/api/admin/users/status') {
-    if (!requireAdmin(request, response)) return
+    if (!await requireAdmin(request, response)) return
     try {
       const body = await readBody(request)
-      const user = adminSetUserStatus(body)
+      const user = await adminSetUserStatus(body)
       sendJson(response, 200, { success: true, user })
     } catch (error) {
       sendError(response, error, 'Could not update user status.')
@@ -359,9 +359,9 @@ async function handleApiRequest(request, response) {
   }
 
   if (request.method === 'POST' && (pathname === '/api/admin/users/balance' || pathname === '/api/admin/users/credit')) {
-    if (!requireAdmin(request, response)) return
+    if (!await requireAdmin(request, response)) return
     try {
-      sendJson(response, 200, { user: adjustUserBalance(await readBody(request)) })
+      sendJson(response, 200, { user: await adjustUserBalance(await readBody(request)) })
     } catch (error) {
       sendError(response, error, 'Could not update the balance.')
     }
@@ -369,9 +369,9 @@ async function handleApiRequest(request, response) {
   }
 
   if (request.method === 'GET' && pathname === '/api/admin/users/detail') {
-    if (!requireAdmin(request, response)) return
+    if (!await requireAdmin(request, response)) return
     try {
-      sendJson(response, 200, getAdminUserDetail(request.query?.userKey || urlObj.searchParams.get('userKey')))
+      sendJson(response, 200, await getAdminUserDetail(request.query?.userKey || urlObj.searchParams.get('userKey')))
     } catch (error) {
       sendError(response, error, 'Could not load the user.')
     }
@@ -379,21 +379,21 @@ async function handleApiRequest(request, response) {
   }
 
   if (request.method === 'GET' && pathname === '/api/admin/notifications') {
-    if (!requireAdmin(request, response)) return
-    sendJson(response, 200, getAdminNotifications())
+    if (!await requireAdmin(request, response)) return
+    sendJson(response, 200, await getAdminNotifications())
     return
   }
 
   if (request.method === 'POST' && pathname === '/api/admin/notifications/read') {
-    if (!requireAdmin(request, response)) return
-    sendJson(response, 200, markAdminNotificationsRead(await readBody(request)))
+    if (!await requireAdmin(request, response)) return
+    sendJson(response, 200, await markAdminNotificationsRead(await readBody(request)))
     return
   }
 
   if (request.method === 'POST' && pathname === '/api/admin/payments/review') {
-    if (!requireAdmin(request, response)) return
+    if (!await requireAdmin(request, response)) return
     try {
-      sendJson(response, 200, reviewPaymentRequest(await readBody(request)))
+      sendJson(response, 200, await reviewPaymentRequest(await readBody(request)))
     } catch (error) {
       sendError(response, error, 'Could not review the payment.')
     }
@@ -401,9 +401,9 @@ async function handleApiRequest(request, response) {
   }
 
   if (request.method === 'POST' && pathname === '/api/admin/withdrawals/review') {
-    if (!requireAdmin(request, response)) return
+    if (!await requireAdmin(request, response)) return
     try {
-      sendJson(response, 200, reviewWithdrawalRequest(await readBody(request)))
+      sendJson(response, 200, await reviewWithdrawalRequest(await readBody(request)))
     } catch (error) {
       sendError(response, error, 'Could not review the withdrawal.')
     }
@@ -412,7 +412,7 @@ async function handleApiRequest(request, response) {
 
   if (request.method === 'POST' && pathname === '/api/users/wallet') {
     try {
-      sendJson(response, 200, getAuthorizedWallet(await readBody(request)))
+      sendJson(response, 200, await getAuthorizedWallet(await readBody(request)))
     } catch (error) {
       sendError(response, error, 'Could not load the wallet.')
     }
@@ -420,9 +420,9 @@ async function handleApiRequest(request, response) {
   }
 
   if (request.method === 'POST' && pathname === '/api/admin/matches/kills') {
-    if (!requireAdmin(request, response)) return
+    if (!await requireAdmin(request, response)) return
     try {
-      recordMatchKills(await readBody(request))
+      await recordMatchKills(await readBody(request))
       sendJson(response, 200, { recorded: true })
     } catch (error) {
       sendJson(response, 400, { message: error instanceof Error ? error.message : 'Could not save kills.' })
@@ -432,7 +432,7 @@ async function handleApiRequest(request, response) {
 
   if (request.method === 'POST' && pathname === '/api/payments/request') {
     try {
-      const payment = recordPaymentRequest(await readBody(request))
+      const payment = await recordPaymentRequest(await readBody(request))
       sendJson(response, 201, { recorded: true, payment })
     } catch (error) {
       sendError(response, error, 'Could not record payment request.')
@@ -442,7 +442,7 @@ async function handleApiRequest(request, response) {
 
   if (request.method === 'POST' && pathname === '/api/matches/entry') {
     try {
-      sendJson(response, 201, { recorded: true, ...recordMatchEntry(await readBody(request)) })
+      sendJson(response, 201, { recorded: true, ...await recordMatchEntry(await readBody(request)) })
     } catch (error) {
       sendError(response, error, 'Could not record match entry.')
     }
@@ -450,9 +450,9 @@ async function handleApiRequest(request, response) {
   }
 
   if (request.method === 'POST' && pathname === '/api/matches/catalog') {
-    if (!requireAdmin(request, response)) return
+    if (!await requireAdmin(request, response)) return
     try {
-      registerMatchCatalog((await readBody(request)).matches)
+      await registerMatchCatalog((await readBody(request)).matches)
       sendJson(response, 201, { recorded: true })
     } catch (error) {
       sendJson(response, 400, { message: error instanceof Error ? error.message : 'Could not record match catalog.' })
@@ -461,13 +461,13 @@ async function handleApiRequest(request, response) {
   }
 
   if (request.method === 'GET' && pathname === '/api/matches/catalog') {
-    sendJson(response, 200, { matches: getPublicMatchCatalog() })
+    sendJson(response, 200, { matches: await getPublicMatchCatalog() })
     return
   }
 
   if (request.method === 'POST' && pathname === '/api/withdrawals/request') {
     try {
-      sendJson(response, 201, { recorded: true, ...recordWithdrawalRequest(await readBody(request)) })
+      sendJson(response, 201, { recorded: true, ...await recordWithdrawalRequest(await readBody(request)) })
     } catch (error) {
       sendError(response, error, 'Could not record withdrawal request.')
     }
