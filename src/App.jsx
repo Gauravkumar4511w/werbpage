@@ -85,6 +85,7 @@ function joinedMatchesFromServer(entries, previous) {
       entryFee: Number(entry.entryFee) || local?.entryFee || 0,
       status: entry.status,
       won: Boolean(entry.won),
+      teamNo: Number(entry.teamNo) || local?.teamNo || null,
       identifier: identifiers[0] || "",
       identifiers,
       roomId: entry.roomId || "",
@@ -1089,7 +1090,7 @@ function App() {
 
                 {detailsEntry && (
                   <div className="match-player-list">
-                    <span className="match-player-list-title">Your team</span>
+                    <span className="match-player-list-title">Your team{detailsEntry.teamNo ? ` · #${detailsEntry.teamNo}` : ""}</span>
                     <div className="match-team-roster">
                       <span className="match-team-label">Joined</span>
                       <div>

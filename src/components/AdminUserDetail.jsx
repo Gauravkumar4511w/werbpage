@@ -23,11 +23,12 @@ function JoinedMatchesTable({ title, rows, emptyText }) {
     <>
       <h3 className="admin-detail-subheading">{title} ({rows.length})</h3>
       <table>
-        <thead><tr><th>Match</th><th>Mode</th><th>Starts</th><th>Entry fee</th><th>In-game names</th><th>Kills</th><th>Status</th></tr></thead>
+        <thead><tr><th>Match</th><th>Team no.</th><th>Mode</th><th>Starts</th><th>Entry fee</th><th>In-game names</th><th>Kills</th><th>Status</th></tr></thead>
         <tbody>
           {rows.length ? rows.map(({ row, result }) => (
             <tr key={row.match_id}>
               <td>{row.public_id ? `#${row.public_id}` : row.match_id}</td>
+              <td>{row.team_no ? `#${row.team_no}` : '-'}</td>
               <td>{row.mode || '-'}</td>
               <td>{row.match_timestamp ? formatDate(Number(row.match_timestamp)) : '-'}</td>
               <td>{row.entry_fee ?? '-'}</td>
@@ -35,7 +36,7 @@ function JoinedMatchesTable({ title, rows, emptyText }) {
               <td>{row.kills ?? '-'}</td>
               <td>{result.label}</td>
             </tr>
-          )) : <tr><td colSpan="7">{emptyText}</td></tr>}
+          )) : <tr><td colSpan="8">{emptyText}</td></tr>}
         </tbody>
       </table>
     </>

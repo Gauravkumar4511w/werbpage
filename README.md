@@ -69,6 +69,7 @@ Player balances live on the server, in the `users` table. The browser only cache
 - **Deactivate.** A deactivated player cannot log in (password or Google), open the wallet, join matches or withdraw, and is signed out on their next wallet refresh.
 - **Match fees.** The server charges the stored entry fee when a player joins. Deleting a match refunds every player who joined it. A match whose result is confirmed cannot be deleted, and confirming twice never pays twice.
 - **Kills.** Enter the match's public ID (such as `#000001`) and a player who joined it.
+- **Team numbers and winners.** Every team that joins a match gets the next number (#1, #2...), shown in Match control, on the user page and to the player. To declare the winner, enter the winning team's number in Match control (or the match ID and number under *Confirm winner*); their winnings go straight into their winning coins. Entries made before team numbers existed are numbered in the order they joined.
 - **Admin emails.** Removing an email from `ADMIN_EMAIL` removes its admin login on the next sign-in attempt.
 
 ## Sign-up, Google sign-in and password reset

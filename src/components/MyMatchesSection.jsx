@@ -52,6 +52,7 @@ function MyMatchesSection({ joinedMatches, currentTime, onBack, onBrowseMatches,
                 </header>
                 <dl>
                   <div><dt>When</dt><dd>{formatWhen(start)}</dd></div>
+                  {match.teamNo && <div><dt>Team no.</dt><dd>#{match.teamNo}</dd></div>}
                   {match.entryFee > 0 && <div><dt>Entry</dt><dd>{Number(match.entryFee).toLocaleString()} coins</dd></div>}
                   <div className="my-match-players"><dt>{players.length > 1 ? 'Your team' : 'Player'}</dt><dd>{players.join(', ') || 'Confirmed'}</dd></div>
                 </dl>
@@ -80,7 +81,7 @@ function MyMatchesSection({ joinedMatches, currentTime, onBack, onBrowseMatches,
             {past.map(({ match }) => (
               <article className="match-history-row" key={match.id}>
                 <div className="match-game-mark">FF</div>
-                <div><h3>{match.mode || 'Joined match'}</h3><p>{match.publicId || 'Match'} · {formatWhen(Number(match.matchTimestamp))}</p></div>
+                <div><h3>{match.mode || 'Joined match'}</h3><p>{match.publicId || 'Match'}{match.teamNo ? ` · Team #${match.teamNo}` : ''} · {formatWhen(Number(match.matchTimestamp))}</p></div>
                 <strong className={match.won ? 'victory' : 'defeat'}>{match.won ? 'WON' : 'PLAYED'}</strong>
                 <span>{(match.identifiers?.length ? match.identifiers : [match.identifier]).filter(Boolean).join(', ')}</span>
               </article>
