@@ -39,8 +39,8 @@ before(async () => {
   admin = { authorization: `Bearer ${login.data.token}` }
   for (const [index, player] of players.entries()) {
     // Sign-up is by email now; mobile-number accounts come from before that, so create them directly.
-    db.registerOrUpdateUser({ userKey: player.userKey, displayName: `Player${index + 1}`, phone: player.userKey, password: player.password }, { trusted: true })
-    db.adjustUserBalance({ userKey: player.userKey, amount: 1000, wallet: 'credit' })
+    await db.registerOrUpdateUser({ userKey: player.userKey, displayName: `Player${index + 1}`, phone: player.userKey, password: player.password }, { trusted: true })
+    await db.adjustUserBalance({ userKey: player.userKey, amount: 1000, wallet: 'credit' })
   }
 })
 
@@ -48,7 +48,7 @@ function scheduled(now, mode, round = 1) {
   return getScheduledMatches(now).filter((match) => match.mode === mode)[round]
 }
 
-test('the schedule uses India time whatever the server time zone', () => {
+test('the schedule uses India time whatever the server time zone', async () => {
   const lateNightInIndia = Date.UTC(2026, 8, 27, 20, 0) // 01:30 on 28 September in India
   for (const now of [monday, lateNightInIndia]) {
     const first = getScheduledMatches(now)[0]
@@ -57,72 +57,72 @@ test('the schedule uses India time whatever the server time zone', () => {
   }
 })
 
-test('joining works on every day, even after earlier days used the same browser numbering', () => {
+test('joining works on every day, even after earlier days used the same browser numbering', async () => {
   // Older builds stored numbered matches from "today"; the next day restarted at #000001 and joins
   // failed with "UNIQUE constraint failed: matches.public_id".
   const lastWeek = monday - 10 * 24 * hour
-  db.getPublicMatchCatalog(lastWeek)
+  await db.getPublicMatchCatalog(lastWeek)
   for (const now of [monday, monday + 24 * hour]) {
     const match = scheduled(now, 'Battle Royale Solo')
-    const result = db.recordMatchEntry({ ...players[0], matchId: match.id, identifiers: ['ShadowKite'] }, now)
+    const result = await db.recordMatchEntry({ ...players[0], matchId: match.id, identifiers: ['ShadowKite'] }, now)
     assert.equal(result.charged, 50)
     assert.ok(result.wallet.entries.some((entry) => entry.matchId === match.id.toLowerCase()))
   }
-  const publicIds = db.getPublicMatchCatalog(monday).map((match) => match.public_id)
+  const publicIds = (await db.getPublicMatchCatalog(monday)).map((match) => match.public_id)
   assert.equal(new Set(publicIds).size, publicIds.length)
 })
 
-test('the catalog shows upcoming matches with a shared joined count', () => {
+test('the catalog shows upcoming matches with a shared joined count', async () => {
   const match = scheduled(monday, 'Battle Royale Solo')
-  const catalog = db.getPublicMatchCatalog(monday)
+  const catalog = await db.getPublicMatchCatalog(monday)
   assert.ok(catalog.every((item) => item.match_timestamp >= monday - 24 * hour))
   assert.equal(catalog.find((item) => item.match_id === match.id.toLowerCase()).joined_count, 1)
 })
 
 test('matches cannot be joined after they start, when full, deleted or unknown', async () => {
   const started = scheduled(monday, 'Lone Wolf 1v1', 0)
-  assert.throws(() => db.recordMatchEntry({ ...players[0], matchId: started.id, identifiers: ['ShadowKite'] }, started.matchTimestamp + 1000), /already started/)
+  await assert.rejects(() => db.recordMatchEntry({ ...players[0], matchId: started.id, identifiers: ['ShadowKite'] }, started.matchTimestamp + 1000), /already started/)
 
   const duel = scheduled(monday, 'Clash Squad 1v1')
-  db.recordMatchEntry({ ...players[0], matchId: duel.id, identifiers: ['PlayerOne'] }, monday)
-  db.recordMatchEntry({ ...players[1], matchId: duel.id, identifiers: ['PlayerTwo'] }, monday)
-  assert.throws(() => db.recordMatchEntry({ ...players[2], matchId: duel.id, identifiers: ['PlayerThree'] }, monday), /full/)
+  await db.recordMatchEntry({ ...players[0], matchId: duel.id, identifiers: ['PlayerOne'] }, monday)
+  await db.recordMatchEntry({ ...players[1], matchId: duel.id, identifiers: ['PlayerTwo'] }, monday)
+  await assert.rejects(() => db.recordMatchEntry({ ...players[2], matchId: duel.id, identifiers: ['PlayerThree'] }, monday), /full/)
 
   const unknown = await request('/api/matches/entry', { body: { ...players[0], matchId: 'made-up-match', entryFee: 1 } })
   assert.equal(unknown.status, 404)
 
   const squad = scheduled(monday, 'Clash Squad 4v4')
-  const catalogMatch = db.getPublicMatchCatalog(monday).find((item) => item.match_id === squad.id.toLowerCase())
+  const catalogMatch = (await db.getPublicMatchCatalog(monday)).find((item) => item.match_id === squad.id.toLowerCase())
   await request('/api/admin/matches/delete', { method: 'DELETE', headers: admin, body: { matchId: catalogMatch.public_id } })
-  assert.throws(() => db.recordMatchEntry({ ...players[0], matchId: squad.id, identifiers: ['A11', 'B22', 'C33', 'D44'] }, monday), /no longer available/)
-  assert.ok(!db.getPublicMatchCatalog(monday).some((item) => item.match_id === squad.id.toLowerCase()))
+  await assert.rejects(() => db.recordMatchEntry({ ...players[0], matchId: squad.id, identifiers: ['A11', 'B22', 'C33', 'D44'] }, monday), /no longer available/)
+  assert.ok(!(await db.getPublicMatchCatalog(monday)).some((item) => item.match_id === squad.id.toLowerCase()))
 })
 
-test('each mode asks for one name per team member and names can be edited until an hour before', () => {
+test('each mode asks for one name per team member and names can be edited until an hour before', async () => {
   const duo = scheduled(monday, 'Battle Royale Duo')
-  assert.throws(() => db.recordMatchEntry({ ...players[1], matchId: duo.id, identifiers: ['OnlyOne'] }, monday), /all 2/)
-  const joined = db.recordMatchEntry({ ...players[1], matchId: duo.id, identifiers: ['Alpha01', 'Bravo02'] }, monday)
+  await assert.rejects(() => db.recordMatchEntry({ ...players[1], matchId: duo.id, identifiers: ['OnlyOne'] }, monday), /all 2/)
+  const joined = await db.recordMatchEntry({ ...players[1], matchId: duo.id, identifiers: ['Alpha01', 'Bravo02'] }, monday)
   assert.equal(joined.charged, 100)
 
-  const edited = db.recordMatchEntry({ ...players[1], matchId: duo.id, identifiers: ['Alpha01', 'Charlie3'] }, monday)
+  const edited = await db.recordMatchEntry({ ...players[1], matchId: duo.id, identifiers: ['Alpha01', 'Charlie3'] }, monday)
   assert.equal(edited.charged, 0)
   assert.deepEqual(edited.wallet.entries.find((entry) => entry.matchId === duo.id.toLowerCase()).identifiers, ['Alpha01', 'Charlie3'])
-  assert.throws(() => db.recordMatchEntry({ ...players[1], matchId: duo.id, identifiers: ['Late1', 'Late2'] }, duo.matchTimestamp - 30 * 60 * 1000), /locked/)
+  await assert.rejects(() => db.recordMatchEntry({ ...players[1], matchId: duo.id, identifiers: ['Late1', 'Late2'] }, duo.matchTimestamp - 30 * 60 * 1000), /locked/)
 
-  const overview = db.getAdminOverview()
+  const overview = await db.getAdminOverview()
   assert.deepEqual(overview.entries.find((entry) => entry.match_id === duo.id.toLowerCase()).identifiers, ['Alpha01', 'Charlie3'])
 })
 
 test('room details set by the admin reach joined players 10 minutes before the start', async () => {
   const duo = scheduled(monday, 'Battle Royale Duo')
-  const catalogMatch = db.getPublicMatchCatalog(monday).find((item) => item.match_id === duo.id.toLowerCase())
+  const catalogMatch = (await db.getPublicMatchCatalog(monday)).find((item) => item.match_id === duo.id.toLowerCase())
   const saved = await request('/api/admin/matches/update', { method: 'PATCH', headers: admin, body: { publicId: catalogMatch.public_id, roomId: '4455667', roomPassword: 'ff123' } })
   assert.equal(saved.status, 200)
 
-  const entryAt = (now) => db.getAuthorizedWallet(players[1], now).entries.find((entry) => entry.matchId === duo.id.toLowerCase())
-  assert.equal(entryAt(duo.matchTimestamp - hour).roomId, '')
-  assert.equal(entryAt(duo.matchTimestamp - 5 * 60 * 1000).roomId, '4455667')
-  assert.equal(entryAt(duo.matchTimestamp - 5 * 60 * 1000).roomPassword, 'ff123')
+  const entryAt = async (now) => (await db.getAuthorizedWallet(players[1], now)).entries.find((entry) => entry.matchId === duo.id.toLowerCase())
+  assert.equal((await entryAt(duo.matchTimestamp - hour)).roomId, '')
+  assert.equal((await entryAt(duo.matchTimestamp - 5 * 60 * 1000)).roomId, '4455667')
+  assert.equal((await entryAt(duo.matchTimestamp - 5 * 60 * 1000)).roomPassword, 'ff123')
 })
 
 test('players can log in on another device with the number typed differently', async () => {

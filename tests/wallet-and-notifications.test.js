@@ -165,3 +165,15 @@ test('mark all notifications read', async () => {
   const cleared = await request('/api/admin/notifications/read', { headers: admin, body: {} })
   assert.equal(cleared.data.unreadNotifications, 0)
 })
+
+test('requests arriving together never hit a locked database', async () => {
+  const results = await Promise.all(Array.from({ length: 12 }, (_, index) => (index % 2
+    ? request('/api/admin/users/balance', { headers: admin, body: { userKey: player.userKey, wallet: 'credit', amount: 5, note: `Burst ${index}` } })
+    : request('/api/presence/heartbeat', { body: { sessionId: `burst-${index}`, userKey: player.userKey } }))))
+  assert.deepEqual(results.map((result) => result.status), Array(12).fill(200))
+  const wallet = await request('/api/users/wallet', { body: player })
+  const credited = wallet.data.creditCoins
+  const again = await Promise.all(Array.from({ length: 6 }, () => request('/api/admin/users/balance', { headers: admin, body: { userKey: player.userKey, wallet: 'credit', amount: 1 } })))
+  assert.ok(again.every((result) => result.status === 200))
+  assert.equal((await request('/api/users/wallet', { body: player })).data.creditCoins, credited + 6)
+})

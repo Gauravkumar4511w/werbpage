@@ -49,7 +49,17 @@ Run `npm run dev` from this directory and open `http://localhost:5173/#admin`. T
 
 Admin sessions use signed tokens when `ADMIN_PASSWORD` is configured, so separate API instances can verify the same login. You can set a private `ADMIN_SESSION_SECRET` to use a separate signing key. Keep that key identical across instances; changing it invalidates existing signed sessions.
 
-Deploy the repository, including `api/` and `vercel.json`, rather than only the `dist/` folder. Local SQLite files are excluded from serverless function bundles. SQLite application data still requires a persistent backend for production; signed login sessions do not make the serverless filesystem persistent.
+Deploy the repository, including `api/` and `vercel.json`, rather than only the `dist/` folder. Local SQLite files are excluded from serverless function bundles.
+
+## Database
+
+Accounts, wallets and matches are stored in SQLite through `@libsql/client` (`lib/payout-db.js`).
+
+- **Production:** set `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` in the Vercel environment variables. The data then lives in a [Turso](https://turso.tech) database and survives restarts and deploys. Create the database in the same region as the Vercel functions (`iad1`, so AWS us-east-1), or every query crosses an ocean.
+- **Local development and tests:** without those variables the app uses a SQLite file in `DATABASE_DIR` (default `./data`). Tests always use a temporary file.
+- **Without Turso on Vercel** the file is in `/tmp` and is lost whenever the function restarts, so accounts and coins disappear. The server logs a warning in that case.
+
+All database calls are async. `transaction()` runs one write transaction at a time per process; queries made inside it, including in helpers it calls, use its connection.
 
 ## Admin desk: top-ups, alerts and user balances
 
