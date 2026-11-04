@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import AdminUserDetail, { ReviewButtons } from './AdminUserDetail'
 import { formatDate, formatDay, formatTime, timeAgo, withdrawalDestination } from './adminFormat'
 import ScreenshotButton from './ScreenshotButton'
-import { formatMatchLabel, formatMatchNo, getIndiaDate, getMatchCapacity, pickByMatchNo } from '../../lib/match-schedule.js'
+import { DEFAULT_ENTRY_FEES, MATCH_MODES, formatMatchLabel, formatMatchNo, getIndiaDate, getMatchCapacity, pickByMatchNo } from '../../lib/match-schedule.js'
 
 const emptyOverview = { users: [], matches: [], entries: [], payments: [], withdrawals: [], kills: [], notifications: [], unreadNotifications: 0 }
-const matchModes = ['Battle Royale Solo', 'Battle Royale Duo', 'Battle Royale Squad', 'Clash Squad 1v1', 'Clash Squad 2v2', 'Clash Squad 4v4', 'Lone Wolf 1v1']
-const defaultFees = { 'Battle Royale Solo': 50, 'Battle Royale Duo': 100, 'Battle Royale Squad': 150, 'Clash Squad 1v1': 50, 'Clash Squad 2v2': 100, 'Clash Squad 4v4': 200, 'Lone Wolf 1v1': 75 }
+// The same modes and fees the daily schedule uses, so changing a fee in one place changes both.
+const matchModes = MATCH_MODES
+const defaultFees = DEFAULT_ENTRY_FEES
 const adminTitle = 'ADMIN DESK · ARENACORE'
 
 // datetime-local inputs show local time; toISOString() is UTC and shifted IST matches by 5.5 hours on save.
