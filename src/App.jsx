@@ -5,6 +5,8 @@ import AuthModal from "./components/AuthModal";
 import AdminPanel from "./components/AdminPanel";
 import HeroSection from "./components/HeroSection";
 import LibrarySection from "./components/LibrarySection";
+import MyMatchesSection from "./components/MyMatchesSection";
+import { countUpcomingMatches } from "./myMatches.js";
 import Navbar from "./components/Navbar";
 import TournamentSection from "./components/TournamentSection";
 import WalletModal from "./components/WalletModal";
@@ -78,6 +80,7 @@ function joinedMatchesFromServer(entries, previous) {
       publicId: entry.publicId ? `#${entry.publicId}` : local?.publicId || "",
       mode: entry.mode || local?.mode || "",
       matchTimestamp: Number(entry.matchTimestamp) || local?.matchTimestamp || 0,
+      entryFee: Number(entry.entryFee) || local?.entryFee || 0,
       status: entry.status,
       identifier: identifiers[0] || "",
       identifiers,
@@ -129,6 +132,7 @@ function saveUserData(user, data) {
 function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
+  const [myMatchesOpen, setMyMatchesOpen] = useState(() => window.location.hash === "#my-matches");
   const [tournamentsOpen, setTournamentsOpen] = useState(() => window.location.hash === "#tournaments");
   const [adminOpen, setAdminOpen] = useState(() => window.location.hash === "#admin");
   const [focusMatchId, setFocusMatchId] = useState(null);
@@ -585,6 +589,7 @@ function App() {
     setJoinedMatches([]);
     userDataReady.current = false;
     setLibraryOpen(false);
+    setMyMatchesOpen(false);
     setTournamentsOpen(false);
     setWalletOpen(false);
     setFocusMatchId(null);
@@ -674,19 +679,36 @@ function App() {
     setFocusMatchId(null);
     setTournamentsOpen(true);
     setLibraryOpen(false);
+    setMyMatchesOpen(false);
     setMenuOpen(false);
   };
 
   const openHome = (event) => {
     event.preventDefault();
     setLibraryOpen(false);
+    setMyMatchesOpen(false);
     setTournamentsOpen(false);
     setMenuOpen(false);
+  };
+
+  const openMyMatches = (event) => {
+    event?.preventDefault();
+    setMenuOpen(false);
+    if (!requireLogin()) return;
+    if (window.location.hash !== "#my-matches") window.history.pushState({ view: "my-matches" }, "", "#my-matches");
+    setFocusMatchId(null);
+    setTournamentsOpen(false);
+    setLibraryOpen(false);
+    setMyMatchesOpen(true);
+    // Fetch the latest entries so a room ID posted a moment ago shows straight away.
+    setWalletSyncTick((tick) => tick + 1);
+    window.scrollTo({ top: 0 });
   };
 
   const backToDiscover = () => {
     setFocusMatchId(null);
     setLibraryOpen(false);
+    setMyMatchesOpen(false);
     setTournamentsOpen(false);
     setMenuOpen(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -696,6 +718,8 @@ function App() {
     const handleBrowserBack = () => {
       setFocusMatchId(null);
       setLibraryOpen(false);
+      setMyMatchesOpen(window.location.hash === "#my-matches");
+    setMyMatchesOpen(false);
       setTournamentsOpen(false);
       setAdminOpen(window.location.hash === "#admin");
       setWalletOpen(false);
@@ -870,11 +894,15 @@ function App() {
           if (!requireLogin()) return;
           window.history.pushState({ view: "history" }, "", "#library");
           setTournamentsOpen(false);
+          setMyMatchesOpen(false);
           setLibraryOpen(true);
           setMenuOpen(false);
         }}
         libraryOpen={libraryOpen}
         tournamentsOpen={tournamentsOpen}
+        myMatchesOpen={myMatchesOpen}
+        onMyMatches={openMyMatches}
+        upcomingMatchCount={player ? countUpcomingMatches(visibleJoinedMatches, currentTime) : 0}
         onTournaments={openTournaments}
         onCoinClick={() => {
           if (!requireLogin()) return;
@@ -888,6 +916,9 @@ function App() {
           setAdminOpen(true);
           setWalletOpen(false);
           setLibraryOpen(false);
+          setMyMatchesOpen(false);
+      setMyMatchesOpen(false);
+    setMyMatchesOpen(false);
           setTournamentsOpen(false);
           setMenuOpen(false);
         }}
@@ -904,6 +935,20 @@ function App() {
           onMatchDetails={handleOpenMatchDetails}
           focusMatchId={focusMatchId}
         />
+      ) : myMatchesOpen ? (
+        <MyMatchesSection
+          joinedMatches={visibleJoinedMatches}
+          currentTime={currentTime}
+          onBack={backToDiscover}
+          onBrowseMatches={openTournaments}
+          onOpenDetails={handleOpenMatchDetails}
+          onEditNames={(match) => {
+            window.history.pushState({ view: "matches" }, "", "#tournaments");
+            setFocusMatchId(match.id);
+            setMyMatchesOpen(false);
+            setTournamentsOpen(true);
+          }}
+        />
       ) : libraryOpen ? (
         <LibrarySection
           libraryOpen={libraryOpen}
@@ -914,6 +959,10 @@ function App() {
             if (!requireLogin()) return;
             setFocusMatchId(match.id);
             setLibraryOpen(false);
+            setMyMatchesOpen(false);
+          setMyMatchesOpen(false);
+      setMyMatchesOpen(false);
+    setMyMatchesOpen(false);
             setTournamentsOpen(true);
           }}
         />

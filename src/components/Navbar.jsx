@@ -1,4 +1,4 @@
-function Navbar({ menuOpen, setMenuOpen, player, setAuthOpen, onHome, onHistory, libraryOpen, tournamentsOpen, onTournaments, onCoinClick, coinBalance, onAdmin }) {
+function Navbar({ menuOpen, setMenuOpen, player, setAuthOpen, onHome, onHistory, libraryOpen, tournamentsOpen, myMatchesOpen, onMyMatches, upcomingMatchCount, onTournaments, onCoinClick, coinBalance, onAdmin }) {
   const closeMenu = () => setMenuOpen(false)
   const openWallet = () => { closeMenu(); onCoinClick() }
   const openAccount = () => { closeMenu(); setAuthOpen(true) }
@@ -34,10 +34,11 @@ function Navbar({ menuOpen, setMenuOpen, player, setAuthOpen, onHome, onHistory,
 
       <div id="primary-navigation" className={`nav-content${menuOpen ? ' is-open' : ''}`}>
         <div className="nav-links">
-          <a className={`nav-link${!libraryOpen && !tournamentsOpen ? ' active' : ''}`} href="#discover" onClick={onHome}>Discover</a>
+          <a className={`nav-link${!libraryOpen && !tournamentsOpen && !myMatchesOpen ? ' active' : ''}`} href="#discover" onClick={onHome}>Discover</a>
           <a className={`nav-link${libraryOpen ? ' active' : ''}`} href="#library" onClick={onHistory}>History</a>
           <a className="nav-link" href="#community" onClick={closeMenu}>Community</a>
           <a className={`nav-link${tournamentsOpen ? ' active' : ''}`} href="#tournaments" onClick={onTournaments}>Matches <span className="live-dot">LIVE</span></a>
+          <a className={`nav-link${myMatchesOpen ? ' active' : ''}`} href="#my-matches" onClick={onMyMatches}>My Matches{upcomingMatchCount > 0 && <span className="my-matches-count" aria-label={`${upcomingMatchCount} upcoming`}>{upcomingMatchCount}</span>}</a>
         </div>
         <div className="nav-actions">
           <button className="admin-link" type="button" onClick={onAdmin}>Admin</button>
