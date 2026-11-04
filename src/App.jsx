@@ -741,7 +741,14 @@ function App() {
     };
     localStorage.setItem("nexus-pending-payment", JSON.stringify(pending));
     setPendingPayment(pending);
-    setWalletMessage("Scan the QR code to complete your payment.");
+    setWalletMessage("");
+  };
+  // Closes the QR without paying, so the player can pick another amount or leave.
+  const cancelUpiPayment = () => {
+    localStorage.removeItem("nexus-pending-payment");
+    setPendingPayment(null);
+    setManualUtr("");
+    setWalletMessage("");
   };
 
   const openPendingUpiPayment = () => {
@@ -948,6 +955,7 @@ function App() {
           buyAmount={buyAmount}
           setBuyAmount={setBuyAmount}
           onUpiBuy={startUpiPayment}
+          onCancelPayment={cancelUpiPayment}
           onOpenUpiPayment={openPendingUpiPayment}
           manualUtr={manualUtr}
           setManualUtr={setManualUtr}
