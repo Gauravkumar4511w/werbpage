@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { formatDate, ledgerReasons, withdrawalDestination } from './adminFormat'
+import ScreenshotButton from './ScreenshotButton'
 
 const sections = [
   ['wallet', 'Wallet history'],
@@ -8,7 +9,7 @@ const sections = [
   ['matches', 'Matches'],
 ]
 
-function AdminUserDetail({ detail, busy, onAdjust, onSetStatus, onRefresh, onClose, onReviewPayment, onReviewWithdrawal }) {
+function AdminUserDetail({ detail, busy, onAdjust, onSetStatus, onRefresh, onClose, onReviewPayment, onReviewWithdrawal, onViewUpload }) {
   const { user, totals, transactions, payments, withdrawals, entries } = detail
   const [form, setForm] = useState({ wallet: 'credit', amount: '', note: '' })
   const [formError, setFormError] = useState('')
@@ -124,24 +125,25 @@ function AdminUserDetail({ detail, busy, onAdjust, onSetStatus, onRefresh, onClo
         )}
         {section === 'topups' && (
           <table>
-            <thead><tr><th>ID</th><th>Coins</th><th>UTR</th><th>Status</th><th>Submitted</th><th>Action</th></tr></thead>
+            <thead><tr><th>ID</th><th>Coins</th><th>UTR</th><th>Proof</th><th>Status</th><th>Submitted</th><th>Action</th></tr></thead>
             <tbody>
               {payments.length ? payments.map((row) => (
                 <tr key={row.id}>
                   <td>#{row.id}</td>
                   <td>{row.coins.toLocaleString()}</td>
                   <td><code>{row.utr || '-'}</code></td>
+                  <td><ScreenshotButton show={row.has_screenshot} onView={() => onViewUpload('payment', row.id, `Top-up #${row.id} · UTR ${row.utr}`)} /></td>
                   <td><span className={`admin-status is-${row.status}`} title={row.review_note || undefined}>{row.status}</span></td>
                   <td>{formatDate(row.created_at)}</td>
                   <td>{row.status === 'pending' ? <ReviewButtons busy={busy} onApprove={() => onReviewPayment({ ...row, user_key: user.user_key }, 'approve')} onReject={() => onReviewPayment({ ...row, user_key: user.user_key }, 'reject')} /> : formatDate(row.reviewed_at)}</td>
                 </tr>
-              )) : <tr><td colSpan="6">No top-up requests.</td></tr>}
+              )) : <tr><td colSpan="7">No top-up requests.</td></tr>}
             </tbody>
           </table>
         )}
         {section === 'withdrawals' && (
           <table>
-            <thead><tr><th>ID</th><th>Coins</th><th>Method</th><th>Pay to</th><th>Status</th><th>Requested</th><th>Action</th></tr></thead>
+            <thead><tr><th>ID</th><th>Coins</th><th>Method</th><th>Pay to</th><th>QR</th><th>Status</th><th>Requested</th><th>Action</th></tr></thead>
             <tbody>
               {withdrawals.length ? withdrawals.map((row) => (
                 <tr key={row.id}>
@@ -149,11 +151,12 @@ function AdminUserDetail({ detail, busy, onAdjust, onSetStatus, onRefresh, onClo
                   <td>{row.amount.toLocaleString()}</td>
                   <td>{row.method.toUpperCase()}</td>
                   <td>{withdrawalDestination(row)}</td>
+                  <td><ScreenshotButton show={row.has_screenshot} onView={() => onViewUpload('withdrawal', row.id, `Withdrawal #${row.id} · ${withdrawalDestination(row)}`)} /></td>
                   <td><span className={`admin-status is-${row.status}`} title={row.review_note || undefined}>{row.status}</span></td>
                   <td>{formatDate(row.created_at)}</td>
                   <td>{row.status === 'pending' ? <ReviewButtons busy={busy} approveLabel="Mark paid" onApprove={() => onReviewWithdrawal({ ...row, user_key: user.user_key }, 'approve')} onReject={() => onReviewWithdrawal({ ...row, user_key: user.user_key }, 'reject')} /> : formatDate(row.reviewed_at)}</td>
                 </tr>
-              )) : <tr><td colSpan="7">No withdrawal requests.</td></tr>}
+              )) : <tr><td colSpan="8">No withdrawal requests.</td></tr>}
             </tbody>
           </table>
         )}

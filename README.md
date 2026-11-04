@@ -73,6 +73,8 @@ Player balances live on the server, in the `users` table. The browser only cache
 
 - **Top-up alerts.** When a player submits a UTR, the Admin Desk plays a sound, shows a pop-up and adds the request under **Alerts**. Desktop notifications appear too once you click *Enable desktop alerts*. Withdrawal requests raise the same alerts.
 - **Verify a top-up.** Find the UTR in your UPI or bank statement, then click **Approve** under *Payments* to credit the coins. **Reject** takes a reason, which the player sees. A UTR can only be claimed once.
+- **Screenshots.** The top-up payment screenshot and the withdrawal UPI QR are uploaded with the request (shrunk in the browser to a JPEG under 2 MB, checked on the server to be a real PNG, JPEG or WebP) and stored in the `uploads` table. **View** in the Payments and Withdrawals tables, and on the user page, opens them.
+- **UPI withdrawals** ask for the name on the UPI account; *Pay to* shows it next to the UPI ID.
 - **User lookup.** Under *Users*, enter a user key (email or phone) or a gamer tag. The user page shows the player's balances, wallet history, top-ups, withdrawals and matches. From there you can add or deduct credit or winning coins; a balance can never go below zero.
 - **Withdrawals.** A request holds the player's winning coins straight away. **Mark paid** after you send the money; **Reject** refunds the coins.
 - **Match fees.** The server charges the stored entry fee when a player joins. Deleting a match refunds every player who joined it.

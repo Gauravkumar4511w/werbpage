@@ -9,6 +9,7 @@ import Navbar from "./components/Navbar";
 import TournamentSection from "./components/TournamentSection";
 import WalletModal from "./components/WalletModal";
 import { EDIT_LOCK_MS, getTeamSize } from "../lib/match-schedule.js";
+import { imageFileToDataUrl } from "./imageUpload.js";
 
 const userDataStorageKey = "nexus-user-data";
 const emptyAuthForm = { username: "", email: "", phone: "", password: "", otp: "", loginMethod: "email" };
@@ -148,6 +149,7 @@ function App() {
   const [withdrawMethod, setWithdrawMethod] = useState("upi");
   const [withdrawDetails, setWithdrawDetails] = useState({
     upiId: "",
+    upiName: "",
     accountName: "",
     accountNumber: "",
     ifsc: "",
@@ -752,7 +754,7 @@ function App() {
     window.location.assign(pendingPayment.upiUrl);
   };
 
-  const submitPaymentProof = async ({ utr }) => {
+  const submitPaymentProof = async ({ utr, screenshot }) => {
     if (!requireLogin() || !pendingPayment) return false;
     try {
       const { payment } = await postJson("/api/payments/request", {
@@ -760,6 +762,7 @@ function App() {
         password: player.password,
         amount: pendingPayment.amount,
         utr,
+        screenshot: await imageFileToDataUrl(screenshot),
       });
       setWalletActivity((current) => ({ ...current, payments: [payment, ...current.payments] }));
       paymentStatuses.current = { ...(paymentStatuses.current || {}), [payment.id]: payment.status };
@@ -798,6 +801,10 @@ function App() {
       setWalletMessage("Enter a valid UPI ID, for example player@upi.");
       return;
     }
+    if (withdrawMethod === "upi" && withdrawDetails.upiName.trim().length < 2) {
+      setWalletMessage("Enter the name on your UPI account, so the admin pays the right person.");
+      return;
+    }
     if (!withdrawalScreenshot) {
       setWalletMessage("Upload your UPI QR screenshot for withdrawal verification.");
       return;
@@ -819,7 +826,8 @@ function App() {
         password: player.password,
         amount,
         method: withdrawMethod,
-        details: { ...withdrawDetails, qrScreenshotName: withdrawalScreenshot.name },
+        details: withdrawDetails,
+        qrScreenshot: await imageFileToDataUrl(withdrawalScreenshot),
       });
       setPurchasedCoins(wallet.creditCoins);
       setWinningCoins(wallet.winningCoins);
