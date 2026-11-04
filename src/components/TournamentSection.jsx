@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { DEFAULT_ENTRY_FEES, EDIT_LOCK_MS, MATCH_MODES, getMatchCapacity, getScheduledMatches } from '../../lib/match-schedule.js'
-import freeFireMaxIcon from '../assets/image_10d29343.jpg'
-import battleRoyalImage from '../assets/battelroyal.png'
-import clashSquadImage from '../assets/clashsquad.png'
-import loneWolfImage from '../assets/lone wolf.png'
+import freeFireMaxIcon from '../assets/hero-banner.jpg'
+import battleRoyalImage from '../assets/battelroyal.jpg'
+import clashSquadImage from '../assets/clashsquad.jpg'
+import loneWolfImage from '../assets/lone-wolf.jpg'
 
 const matchGroups = MATCH_MODES.map((mode) => ({ name: mode, modes: [mode] }))
 
@@ -82,6 +82,9 @@ function TournamentSection({ tournamentsOpen, onBack, joinedMatches, onJoinMatch
     return () => window.clearInterval(refreshTimer)
   }, [])
 
+  // Joining changes a match's player count, so the catalog is fetched again straight away.
+  const joinedTotal = joinedMatches.length
+
   // The server catalog is the source of truth: match numbers, fees, times, deletions and joined counts.
   useEffect(() => {
     if (!tournamentsOpen) return undefined
@@ -108,7 +111,7 @@ function TournamentSection({ tournamentsOpen, onBack, joinedMatches, onJoinMatch
       active = false
       window.clearInterval(timer)
     }
-  }, [tournamentsOpen])
+  }, [tournamentsOpen, joinedTotal])
 
   const toggleMatches = (mode) => {
     setExpandedMode((currentMode) => currentMode === mode ? null : mode)
@@ -140,7 +143,7 @@ function TournamentSection({ tournamentsOpen, onBack, joinedMatches, onJoinMatch
     >
       <button className="library-back" type="button" onClick={onBack}>&lt;- Back to discover</button>
       <div className="tournament-heading">
-        <div><p className="eyebrow"><span></span> Free Fire MAX arena</p><h2 id="tournament-title">LIVE MATCHES.</h2><p>Two matches in every mode, scheduled from 8:00 AM to 11:00 PM.</p></div>
+        <div><p className="eyebrow"><span></span> Free Fire MAX arena</p><h2 id="tournament-title">LIVE MATCHES.</h2><p>Two matches in every mode, every day from 8:00 AM to 1:20 AM.</p></div>
         <button className="tournament-badge" type="button" onClick={() => setLiveOpen((open) => !open)} aria-expanded={liveOpen}><span></span> LIVE SCHEDULE</button>
       </div>
       {liveOpen ? (

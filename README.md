@@ -1,28 +1,15 @@
 # React + Vite
 
-## Razorpay UPI coin purchases
+## Buying coins by UPI
 
-The buy-coins flow uses Razorpay Checkout, where users can select UPI. Add these values to `.env` locally and to the Vercel project environment variables:
+Players buy coins by paying the site's UPI ID, then sending the UTR and a payment screenshot. The admin checks the UTR in the UPI or bank statement and approves it in the Admin Desk, which credits the coins (see *Admin desk* below). Set the UPI ID the QR pays to in `.env` and in the Vercel environment variables, then rebuild:
 
 ```env
-VITE_RAZORPAY_KEY_ID=rzp_live_your_public_key
-RAZORPAY_KEY_ID=rzp_live_your_public_key
-RAZORPAY_KEY_SECRET=your_server_secret
+VITE_UPI_ID=yourname@okaxis
+VITE_UPI_NAME=ARENACORE
 ```
 
-`RAZORPAY_KEY_SECRET` must remain server-side. Orders are created by `/api/payments/razorpay/order`, and `/api/payments/razorpay/verify` checks the Razorpay signature and captured payment before the client adds coins.
-
-Copy `.env.example` to `.env` and add your Razorpay credentials. Keep `RAZORPAY_KEY_SECRET` server-side.
-
-Run the payment API and frontend separately:
-
-```powershell
-npm run api
-npm run dev
-```
-
-The buy flow creates a Razorpay order and verifies the captured payment signature before adding coins. A persistent server-side wallet ledger is still recommended for production crediting.
-
+Without `VITE_UPI_ID` the wallet shows "UPI ID is not configured." and nobody can buy coins.
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
@@ -76,8 +63,13 @@ Player balances live on the server, in the `users` table. The browser only cache
 - **Screenshots.** The top-up payment screenshot and the withdrawal UPI QR are uploaded with the request (shrunk in the browser to a JPEG under 2 MB, checked on the server to be a real PNG, JPEG or WebP) and stored in the `uploads` table. **View** in the Payments and Withdrawals tables, and on the user page, opens them.
 - **UPI withdrawals** ask for the name on the UPI account; *Pay to* shows it next to the UPI ID.
 - **User lookup.** Under *Users*, enter a user key (email or phone) or a gamer tag. The user page shows the player's balances, wallet history, top-ups, withdrawals and matches. From there you can add or deduct credit or winning coins; a balance can never go below zero.
-- **Withdrawals.** A request holds the player's winning coins straight away. **Mark paid** after you send the money; **Reject** refunds the coins.
-- **Match fees.** The server charges the stored entry fee when a player joins. Deleting a match refunds every player who joined it.
+- **Withdrawals.** A request holds the player's winning coins straight away. **Mark paid** after you send the money; **Reject** refunds the coins. UPI withdrawals need the player's UPI QR; bank transfers do not.
+- **Late payments.** The payment QR is payable for 5 minutes, but a player who paid late can still send the UTR and screenshot for 24 hours from that wallet.
+- **Add active user.** Give the player a login password and share it with them. An email account added without one is taken over by whoever signs up with that email (with its opening coins); nobody can use an account that has no password.
+- **Deactivate.** A deactivated player cannot log in (password or Google), open the wallet, join matches or withdraw, and is signed out on their next wallet refresh.
+- **Match fees.** The server charges the stored entry fee when a player joins. Deleting a match refunds every player who joined it. A match whose result is confirmed cannot be deleted, and confirming twice never pays twice.
+- **Kills.** Enter the match's public ID (such as `#000001`) and a player who joined it.
+- **Admin emails.** Removing an email from `ADMIN_EMAIL` removes its admin login on the next sign-in attempt.
 
 ## Sign-up, Google sign-in and password reset
 
@@ -88,7 +80,7 @@ New players sign up with an email address and a code emailed to it:
 
 Players who forget their password use **Forgot password?** on the login form. `/api/auth/password/forgot` emails a code to the account's address, and `/api/auth/password/reset` sets the new password once the code matches. A reset signs the account out on every other device. Mobile-number accounts can reset too, once they have an email saved in their profile. Mobile-number accounts still log in with their number and password; new accounts cannot sign up with a number.
 
-Codes expire after 10 minutes. An email gets one code every 30 seconds and five an hour, and a code locks after five wrong tries. A sign-up code cannot reset a password, nor the other way round. The token is signed with `OTP_SECRET` (falling back to `ADMIN_SESSION_SECRET`), so it verifies on any serverless instance; keep that secret identical everywhere.
+Codes expire after 10 minutes. An email gets one code every 30 seconds and five an hour for each purpose (sign-up and reset are counted apart), and a code locks after five wrong tries, even when guesses arrive at the same moment. A sign-up code cannot reset a password, nor the other way round. The token is signed with `OTP_SECRET` (falling back to `ADMIN_SESSION_SECRET`), so it verifies on any serverless instance; keep that secret identical everywhere.
 
 Email providers, set in `.env` and in the Vercel environment variables:
 
@@ -103,6 +95,7 @@ The **Continue with Google** button appears once `GOOGLE_CLIENT_ID` is set; the 
 
 - A new email gets a new account, with a gamer tag made from the Google name. An existing account with that email is logged into.
 - A Google-only account gets a random password nobody knows, and can set a real one with **Forgot password?**.
+- An email typed into a mobile-number account's profile is unproven until a **Forgot password?** code reaches it. Until then Google sign-in with that email does not open the mobile account, and the email's real owner can still sign up with it.
 
 To get a client ID: in console.cloud.google.com, open **APIs & Services → Credentials → Create credentials → OAuth client ID**, choose **Web application**, and add every site address under **Authorized JavaScript origins** (for example `https://ffarenacore.vercel.app` and `http://localhost:5173`).
 

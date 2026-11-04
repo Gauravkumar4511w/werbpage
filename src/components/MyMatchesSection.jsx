@@ -81,7 +81,7 @@ function MyMatchesSection({ joinedMatches, currentTime, onBack, onBrowseMatches,
               <article className="match-history-row" key={match.id}>
                 <div className="match-game-mark">FF</div>
                 <div><h3>{match.mode || 'Joined match'}</h3><p>{match.publicId || 'Match'} · {formatWhen(Number(match.matchTimestamp))}</p></div>
-                <strong className="victory">PLAYED</strong>
+                <strong className={match.won ? 'victory' : 'defeat'}>{match.won ? 'WON' : 'PLAYED'}</strong>
                 <span>{(match.identifiers?.length ? match.identifiers : [match.identifier]).filter(Boolean).join(', ')}</span>
               </article>
             ))}

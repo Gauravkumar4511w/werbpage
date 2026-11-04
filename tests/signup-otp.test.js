@@ -270,6 +270,42 @@ test('Google sign-in takes back an account that only a browser re-sync created',
   })
 })
 
+test('Google sign-in only trusts a profile email the account proved owning', async () => {
+  // A mobile-number account types someone else's email into its profile.
+  await db.registerOrUpdateUser({ userKey: '+91 90000 22222', phone: '+91 90000 22222', displayName: 'Typist', password: 'typist-pass' }, { trusted: true })
+  const typist = await login('9000022222', 'typist-pass')
+  const saved = await request('/api/users/profile', { body: { userKey: '+91 90000 22222', password: typist.data.loginSecret, displayName: 'Typist', email: 'not-mine@gmail.com', phone: '+91 90000 22222' } })
+  assert.equal(saved.status, 200, JSON.stringify(saved.data))
+
+  await withGoogle(async () => {
+    // The real owner of the email gets their own new account, not the typist's.
+    const owner = await google(googleToken({ email: 'not-mine@gmail.com', sub: '501' }))
+    assert.equal(owner.status, 200, JSON.stringify(owner.data))
+    assert.equal(owner.data.created, true)
+    assert.equal(owner.data.user.userKey, 'not-mine@gmail.com')
+  })
+
+  // A mobile account that proves its email with a reset code can then use Google with it.
+  await db.registerOrUpdateUser({ userKey: '+91 90000 33333', phone: '+91 90000 33333', displayName: 'Prover', password: 'prover-pass' }, { trusted: true })
+  const prover = await login('9000033333', 'prover-pass')
+  await request('/api/users/profile', { body: { userKey: '+91 90000 33333', password: prover.data.loginSecret, displayName: 'Prover', email: 'proven-mobile@gmail.com', phone: '+91 90000 33333' } })
+  const sent = await forgot('proven-mobile@gmail.com')
+  assert.equal((await reset({ email: 'proven-mobile@gmail.com', otpToken: sent.data.otpToken, otp: sent.data.devOtp, password: 'prover-new-pass' })).status, 200)
+  await withGoogle(async () => {
+    const result = await google(googleToken({ email: 'proven-mobile@gmail.com', sub: '502' }))
+    assert.equal(result.data.created, false)
+    assert.equal(result.data.user.userKey, '+91 90000 33333')
+  })
+})
+
+test('Google sign-in refuses a deactivated account', async () => {
+  await makeAccount('banned-google@gmail.com', 'BannedGoogle', 'banned-pass')
+  await db.adminSetUserStatus({ userKey: 'banned-google@gmail.com', status: 'inactive' })
+  await withGoogle(async () => {
+    assert.equal((await google(googleToken({ email: 'banned-google@gmail.com', sub: '503' }))).status, 403)
+  })
+})
+
 // A minimal SMTP server that accepts one login and records each message it receives.
 function startFakeSmtp() {
   const messages = []

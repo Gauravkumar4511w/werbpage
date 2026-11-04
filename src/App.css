@@ -212,7 +212,7 @@ body { background: #070b10; }
 .coin-balance { border-color: rgba(255,194,87,.42); background: rgba(255,194,87,.07); }
 .profile-button { border-left-color: rgba(85,230,224,.18); }
 .avatar { border-color: var(--cyan); color: var(--cyan); background: rgba(85,230,224,.1); }
-.nav-showcase { max-width: none; min-height: calc(100vh - 82px); padding: clamp(90px, 13vh, 150px) clamp(20px, 8vw, 120px); overflow: hidden; background: linear-gradient(90deg, rgba(5,9,13,.97) 0%, rgba(5,9,13,.78) 37%, rgba(5,9,13,.2) 78%, rgba(5,9,13,.55) 100%), linear-gradient(0deg, rgba(5,9,13,.55), transparent 48%), url('./assets/image_10d29343.jpg') center / cover; }
+.nav-showcase { max-width: none; min-height: calc(100vh - 82px); padding: clamp(90px, 13vh, 150px) clamp(20px, 8vw, 120px); overflow: hidden; background: linear-gradient(90deg, rgba(5,9,13,.97) 0%, rgba(5,9,13,.78) 37%, rgba(5,9,13,.2) 78%, rgba(5,9,13,.55) 100%), linear-gradient(0deg, rgba(5,9,13,.55), transparent 48%), url('./assets/hero-banner.jpg') center / cover; }
 .nav-showcase::before { position: absolute; top: 0; right: 0; bottom: 0; width: 54%; background: linear-gradient(115deg, transparent 0 48%, rgba(85,230,224,.14) 48.2%, transparent 48.5% 67%, rgba(255,112,77,.13) 67.2%, transparent 67.5%), repeating-linear-gradient(120deg, transparent 0 54px, rgba(255,255,255,.045) 55px 56px); content: ''; pointer-events: none; }
 .nav-showcase::after { width: 100%; background: linear-gradient(90deg, transparent, rgba(85,230,224,.28), transparent) 0 100% / 100% 1px no-repeat; }
 .eyebrow { color: var(--cyan); text-shadow: 0 0 14px rgba(85,230,224,.35); }
@@ -294,7 +294,7 @@ body { background: #070b10; }
 .avatar::first-letter { display: inline-block; transform: rotate(-45deg); }
 .profile-copy strong { font-family: var(--mono); }
 .profile-copy small { color: var(--orange); }
-.nav-showcase { min-height: calc(100vh - 90px); padding: clamp(92px, 16vh, 180px) clamp(20px, 9vw, 140px); background: linear-gradient(90deg, rgba(8,10,13,.98) 0%, rgba(8,10,13,.78) 35%, rgba(8,10,13,.08) 76%, rgba(8,10,13,.6) 100%), linear-gradient(0deg, rgba(8,10,13,.68), transparent 54%), url('./assets/image_10d29343.jpg') 56% center / cover; }
+.nav-showcase { min-height: calc(100vh - 90px); padding: clamp(92px, 16vh, 180px) clamp(20px, 9vw, 140px); background: linear-gradient(90deg, rgba(8,10,13,.98) 0%, rgba(8,10,13,.78) 35%, rgba(8,10,13,.08) 76%, rgba(8,10,13,.6) 100%), linear-gradient(0deg, rgba(8,10,13,.68), transparent 54%), url('./assets/hero-banner.jpg') 56% center / cover; }
 .nav-showcase::before { top: 0; right: 0; width: 57%; background: linear-gradient(90deg, transparent, rgba(214,248,91,.75) 1px, transparent 1px) 24% 0 / 26% 100% no-repeat, linear-gradient(135deg, transparent 0 49%, rgba(109,231,255,.28) 49.2%, transparent 49.5%); }
 .nav-showcase::after { bottom: 68px; top: auto; right: auto; left: clamp(20px, 9vw, 140px); width: 110px; height: 1px; background: var(--orange); }
 .eyebrow { color: var(--orange); font-family: var(--mono); font-size: 10px; }
@@ -342,7 +342,7 @@ body { background: #070b10; }
 .avatar { border-radius: 50%; border-color: var(--orange); color: #fff; background: rgba(255,91,61,.16); transform: none; }
 .profile-copy strong { font-family: var(--sans); }
 .profile-copy small { color: #777f87; }
-.nav-showcase { min-height: calc(100vh - 72px); padding: clamp(80px, 15vh, 160px) clamp(20px, 9vw, 140px); background: linear-gradient(90deg, #0d0f13 0%, rgba(13,15,19,.92) 28%, rgba(13,15,19,.32) 66%, rgba(13,15,19,.8) 100%), linear-gradient(0deg, rgba(13,15,19,.6), transparent 55%), url('./assets/image_10d29343.jpg') 62% center / cover; }
+.nav-showcase { min-height: calc(100vh - 72px); padding: clamp(80px, 15vh, 160px) clamp(20px, 9vw, 140px); background: linear-gradient(90deg, #0d0f13 0%, rgba(13,15,19,.92) 28%, rgba(13,15,19,.32) 66%, rgba(13,15,19,.8) 100%), linear-gradient(0deg, rgba(13,15,19,.6), transparent 55%), url('./assets/hero-banner.jpg') 62% center / cover; }
 .nav-showcase::before { top: auto; right: 0; bottom: 0; width: 42%; height: 1px; background: var(--orange); opacity: .8; }
 .nav-showcase::after { display: block; top: 0; right: 10%; bottom: 0; left: auto; width: 1px; height: auto; background: rgba(255,255,255,.1); }
 .eyebrow { color: var(--orange); font-family: var(--sans); font-size: 10px; letter-spacing: .22em; }
@@ -414,7 +414,7 @@ body { background: #0b0c10; }
 /* Subtle refinement of the original composition */
 .navbar { background: rgba(11,12,16,.72); backdrop-filter: blur(12px); }
 .brand { text-shadow: 0 0 20px rgba(255,98,62,.18); }
-.nav-showcase { background: linear-gradient(90deg, rgba(11,12,16,.98) 0%, rgba(11,12,16,.86) 34%, rgba(11,12,16,.32) 78%, rgba(11,12,16,.72) 100%), linear-gradient(0deg, rgba(11,12,16,.42), transparent 55%), url('./assets/image_10d29343.jpg') center / cover; }
+.nav-showcase { background: linear-gradient(90deg, rgba(11,12,16,.98) 0%, rgba(11,12,16,.86) 34%, rgba(11,12,16,.32) 78%, rgba(11,12,16,.72) 100%), linear-gradient(0deg, rgba(11,12,16,.42), transparent 55%), url('./assets/hero-banner.jpg') center / cover; }
 .nav-showcase::after { opacity: .55; }
 .nav-showcase h1 { text-shadow: 0 8px 30px rgba(0,0,0,.38); }
 .primary-cta { box-shadow: 0 9px 24px rgba(255,118,91,.2); transition: transform .2s ease, box-shadow .2s ease, background .2s ease; }
@@ -557,7 +557,7 @@ body { background: #07111c; }
 .live-dot { color: #ffc247; border-color: rgba(255,194,71,.5); }
 .coin-balance { border-color: rgba(255,194,71,.38); background: rgba(255,194,71,.08); }
 .avatar { border-color: #67d6ff; color: #67d6ff; background: rgba(103,214,255,.12); }
-.nav-showcase { background: linear-gradient(90deg, rgba(4,12,22,.95) 0%, rgba(4,12,22,.72) 34%, rgba(4,12,22,.18) 76%, rgba(4,12,22,.58) 100%), linear-gradient(0deg, rgba(4,12,22,.55), transparent 55%), url('./assets/freefire.png') center / cover; }
+.nav-showcase { background: linear-gradient(90deg, rgba(4,12,22,.95) 0%, rgba(4,12,22,.72) 34%, rgba(4,12,22,.18) 76%, rgba(4,12,22,.58) 100%), linear-gradient(0deg, rgba(4,12,22,.55), transparent 55%), url('./assets/freefire.jpg') center / cover; }
 .nav-showcase::before { background: linear-gradient(135deg, transparent 0 48%, rgba(255,194,71,.24) 48.2%, transparent 48.5%), repeating-linear-gradient(120deg, transparent 0 54px, rgba(103,214,255,.045) 55px 56px); }
 .nav-showcase::after { background: linear-gradient(90deg, transparent, rgba(255,194,71,.55), transparent) 0 100% / 100% 1px no-repeat; }
 .eyebrow, .secondary-cta { color: #ffc247; }
@@ -694,10 +694,10 @@ body { background: #07111c; }
 }
 
 /* Broadcast glass direction: keep the layout, unify every surface with the artwork */
-body { background: #050b12 url('./assets/freefire.png') center / cover fixed; }
-.gaming-page { min-height: 100vh; background: linear-gradient(rgba(4,10,17,.72), rgba(4,10,17,.88)), url('./assets/freefire.png') center / cover fixed; }
+body { background: #050b12 url('./assets/freefire.jpg') center / cover fixed; }
+.gaming-page { min-height: 100vh; background: linear-gradient(rgba(4,10,17,.72), rgba(4,10,17,.88)), url('./assets/freefire.jpg') center / cover fixed; }
 .navbar { background: rgba(4,10,17,.3); border-bottom-color: rgba(255,194,71,.28); box-shadow: 0 8px 28px rgba(0,0,0,.2); }
-.nav-showcase { background: linear-gradient(90deg, rgba(4,10,17,.82), rgba(4,10,17,.42) 52%, rgba(4,10,17,.62)), url('./assets/freefire.png') center / cover; }
+.nav-showcase { background: linear-gradient(90deg, rgba(4,10,17,.82), rgba(4,10,17,.42) 52%, rgba(4,10,17,.62)), url('./assets/freefire.jpg') center / cover; }
 .library-section, .tournament-section { background: rgba(5,14,24,.48); backdrop-filter: blur(5px); }
 .game-card, .match-history-row, .tournament-day, .scheduled-match { background: rgba(7,19,31,.45); border-color: rgba(103,214,255,.3); box-shadow: inset 0 1px rgba(255,255,255,.08), 0 14px 30px rgba(0,0,0,.2); }
 .date-heading, .day-heading { background: rgba(8,22,35,.42); }
@@ -750,7 +750,7 @@ body { background: #080e18; }
 .coin-balance { border-color: rgba(105,200,255,.24); background: rgba(105,200,255,.05); }
 .profile-button { border-left-color: rgba(105,200,255,.18); }
 .avatar { border-color: #69c8ff; color: #69c8ff; background: rgba(77,157,255,.14); }
-.nav-showcase { background: linear-gradient(90deg, rgba(8,14,24,.98) 0%, rgba(8,14,24,.86) 35%, rgba(8,14,24,.28) 78%, rgba(8,14,24,.7) 100%), linear-gradient(0deg, rgba(8,14,24,.45), transparent 55%), url('./assets/image_10d29343.jpg') center / cover; }
+.nav-showcase { background: linear-gradient(90deg, rgba(8,14,24,.98) 0%, rgba(8,14,24,.86) 35%, rgba(8,14,24,.28) 78%, rgba(8,14,24,.7) 100%), linear-gradient(0deg, rgba(8,14,24,.45), transparent 55%), url('./assets/hero-banner.jpg') center / cover; }
 .nav-showcase::before { background: rgba(105,200,255,.24); }
 .nav-showcase::after { background: repeating-linear-gradient(0deg, transparent 0 31px, rgba(105,200,255,.055) 32px 33px); }
 .eyebrow, .secondary-cta { color: #69c8ff; }
@@ -816,7 +816,7 @@ body { background: #07111c; }
 .live-dot { color: #ffc247; border-color: rgba(255,194,71,.5); }
 .coin-balance { border-color: rgba(255,194,71,.38); background: rgba(255,194,71,.08); }
 .avatar { border-color: #67d6ff; color: #67d6ff; background: rgba(103,214,255,.12); }
-.nav-showcase { background: linear-gradient(90deg, rgba(4,12,22,.95) 0%, rgba(4,12,22,.72) 34%, rgba(4,12,22,.18) 76%, rgba(4,12,22,.58) 100%), linear-gradient(0deg, rgba(4,12,22,.55), transparent 55%), url('./assets/freefire.png') center / cover; }
+.nav-showcase { background: linear-gradient(90deg, rgba(4,12,22,.95) 0%, rgba(4,12,22,.72) 34%, rgba(4,12,22,.18) 76%, rgba(4,12,22,.58) 100%), linear-gradient(0deg, rgba(4,12,22,.55), transparent 55%), url('./assets/freefire.jpg') center / cover; }
 .nav-showcase::before { background: linear-gradient(135deg, transparent 0 48%, rgba(255,194,71,.24) 48.2%, transparent 48.5%), repeating-linear-gradient(120deg, transparent 0 54px, rgba(103,214,255,.045) 55px 56px); }
 .nav-showcase::after { background: linear-gradient(90deg, transparent, rgba(255,194,71,.55), transparent) 0 100% / 100% 1px no-repeat; }
 .eyebrow, .secondary-cta { color: #ffc247; }

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import AdminUserDetail, { ReviewButtons } from './AdminUserDetail'
 import { formatDate, timeAgo, withdrawalDestination } from './adminFormat'
 import ScreenshotButton from './ScreenshotButton'
+import { getMatchCapacity } from '../../lib/match-schedule.js'
 
 const emptyOverview = { users: [], matches: [], entries: [], payments: [], withdrawals: [], kills: [], notifications: [], unreadNotifications: 0 }
 const matchModes = ['Battle Royale Solo', 'Battle Royale Duo', 'Battle Royale Squad', 'Clash Squad 1v1', 'Clash Squad 2v2', 'Clash Squad 4v4', 'Lone Wolf 1v1']
@@ -67,7 +68,7 @@ function AdminPanel({ onBack }) {
   const [notificationPermission, setNotificationPermission] = useState(() => (typeof Notification === 'undefined' ? 'unsupported' : Notification.permission))
   const [userLookup, setUserLookup] = useState('')
   const [userDetail, setUserDetail] = useState(null)
-  const [userForm, setUserForm] = useState({ userKey: '', displayName: '', creditCoins: '' })
+  const [userForm, setUserForm] = useState({ userKey: '', displayName: '', password: '', creditCoins: '' })
   const [killForm, setKillForm] = useState({ matchId: '', userKey: '', kills: '' })
   const [resultForm, setResultForm] = useState({ matchId: '', winnerTeamKey: '' })
   const [matchLookup, setMatchLookup] = useState('')
@@ -313,10 +314,11 @@ function AdminPanel({ onBack }) {
         body: JSON.stringify({
           userKey: userForm.userKey.trim(),
           displayName: userForm.displayName.trim(),
+          password: userForm.password,
           creditCoins: Number(userForm.creditCoins) || 0,
         }),
       })
-      setUserForm({ userKey: '', displayName: '', creditCoins: '' })
+      setUserForm({ userKey: '', displayName: '', password: '', creditCoins: '' })
       setMessage(`Active user ${data.user?.display_name || data.user?.user_key || userForm.userKey} added and counted.`)
       await loadOverview()
     } catch (error) { setMessage(error.message) }
@@ -439,7 +441,7 @@ function AdminPanel({ onBack }) {
                 autoComplete="username"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                placeholder="gaurav7744@gmail.com or admin"
+                placeholder="Admin email"
                 required
               />
             </label>
@@ -476,7 +478,11 @@ function AdminPanel({ onBack }) {
   const pendingWithdrawals = overview.withdrawals.filter((item) => item.status === 'pending')
   const filteredPayments = overview.payments.filter((item) => (reviewFilter === 'all' || item.status === 'pending') && searchable(item)).sort(byPendingFirst)
   const filteredWithdrawals = overview.withdrawals.filter((item) => (reviewFilter === 'all' || item.status === 'pending') && searchable(item)).sort(byPendingFirst)
+  // Newest start time first, with readable times and how many teams really joined.
+  const joinedTeams = (matchId) => new Set(overview.entries.filter((entry) => entry.match_id === matchId).map((entry) => entry.team_key)).size
   const filteredMatches = overview.matches.filter(searchable)
+    .map((match) => ({ ...match, joined: `${joinedTeams(match.match_id)}/${getMatchCapacity(match.mode).total}`, starts: formatDate(match.match_timestamp) }))
+    .sort((a, b) => Number(b.match_timestamp || 0) - Number(a.match_timestamp || 0))
   const currentSelectedMatch = selectedMatch
     ? overview.matches.find((match) => match.match_id === selectedMatch.match_id) || selectedMatch
     : null
@@ -575,9 +581,9 @@ function AdminPanel({ onBack }) {
         <PaymentReviewTable title="Top-ups waiting for verification" rows={pendingPayments} busy={busy} highlight={highlight} onReview={reviewPayment} onOpenUser={openUser} onViewUpload={viewUpload} emptyText="No top-ups are waiting. New UTR submissions appear here and in Alerts." />
         <div className="admin-grid">
           {userLookupCard}
-          <section className="admin-card"><h2>Add active user</h2><p>Register a new active player directly into the database.</p><form onSubmit={submitCreateUser}><input placeholder="User email / phone" value={userForm.userKey} onChange={(event) => setUserForm({ ...userForm, userKey: event.target.value })} required /><input placeholder="Display name / Gamer tag" value={userForm.displayName} onChange={(event) => setUserForm({ ...userForm, displayName: event.target.value })} required /><input type="number" min="0" placeholder="Opening credit coins (optional)" value={userForm.creditCoins} onChange={(event) => setUserForm({ ...userForm, creditCoins: event.target.value })} /><button type="submit">Add active user</button></form></section>
-          <section className="admin-card"><h2>Record kills</h2><p>Save the final kill count before confirming a result.</p><form onSubmit={submitKills}><input placeholder="Match ID" value={killForm.matchId} onChange={(event) => setKillForm({ ...killForm, matchId: event.target.value })} required /><input placeholder="User email / phone" value={killForm.userKey} onChange={(event) => setKillForm({ ...killForm, userKey: event.target.value })} required /><input type="number" min="0" placeholder="Kills" value={killForm.kills} onChange={(event) => setKillForm({ ...killForm, kills: event.target.value })} required /><button type="submit">Save kills</button></form></section>
-          <section className="admin-card"><h2>Confirm winner</h2><p>Once confirmed, the 80% winnings payout cannot be duplicated.</p><form onSubmit={submitResult}><input placeholder="Match ID" value={resultForm.matchId} onChange={(event) => setResultForm({ ...resultForm, matchId: event.target.value })} required /><input placeholder="Winning team key" value={resultForm.winnerTeamKey} onChange={(event) => setResultForm({ ...resultForm, winnerTeamKey: event.target.value })} required /><button type="submit">Confirm result and payout</button></form></section>
+          <section className="admin-card"><h2>Add active user</h2><p>Register a new active player with a login password. Share the password with the player.</p><form onSubmit={submitCreateUser}><input placeholder="User email / phone" value={userForm.userKey} onChange={(event) => setUserForm({ ...userForm, userKey: event.target.value })} required /><input placeholder="Display name / Gamer tag" value={userForm.displayName} onChange={(event) => setUserForm({ ...userForm, displayName: event.target.value })} required /><input type="text" minLength={6} autoComplete="off" placeholder="Login password for the player (6+ characters)" value={userForm.password} onChange={(event) => setUserForm({ ...userForm, password: event.target.value })} required /><input type="number" min="0" placeholder="Opening credit coins (optional)" value={userForm.creditCoins} onChange={(event) => setUserForm({ ...userForm, creditCoins: event.target.value })} /><button type="submit">Add active user</button></form></section>
+          <section className="admin-card"><h2>Record kills</h2><p>Save the final kill count before confirming a result.</p><form onSubmit={submitKills}><input placeholder="Match ID, e.g. #000001" value={killForm.matchId} onChange={(event) => setKillForm({ ...killForm, matchId: event.target.value })} required /><input placeholder="User email / phone" value={killForm.userKey} onChange={(event) => setKillForm({ ...killForm, userKey: event.target.value })} required /><input type="number" min="0" placeholder="Kills" value={killForm.kills} onChange={(event) => setKillForm({ ...killForm, kills: event.target.value })} required /><button type="submit">Save kills</button></form></section>
+          <section className="admin-card"><h2>Confirm winner</h2><p>Once confirmed, the 80% winnings payout cannot be duplicated.</p><form onSubmit={submitResult}><input placeholder="Match ID, e.g. #000001" value={resultForm.matchId} onChange={(event) => setResultForm({ ...resultForm, matchId: event.target.value })} required /><input placeholder="Winning team key" value={resultForm.winnerTeamKey} onChange={(event) => setResultForm({ ...resultForm, winnerTeamKey: event.target.value })} required /><button type="submit">Confirm result and payout</button></form></section>
         </div>
       </>}
 
@@ -595,7 +601,7 @@ function AdminPanel({ onBack }) {
         <section className="admin-card admin-create-match"><h2>Create new match</h2><p>Select any available mode, choose its time, and publish a custom prize.</p><form className="admin-create-form" onSubmit={submitCreateMatch}><label>Mode<select value={createForm.mode} onChange={(event) => setCreateForm({ ...createForm, mode: event.target.value, entryFee: String(defaultFees[event.target.value]) })}>{matchModes.map((mode) => <option key={mode} value={mode}>{mode}</option>)}</select></label><label>Entry fee<input type="number" min="1" value={createForm.entryFee} onChange={(event) => setCreateForm({ ...createForm, entryFee: event.target.value })} required /></label><label>Date and time<input type="datetime-local" value={createForm.matchTimestamp} onChange={(event) => setCreateForm({ ...createForm, matchTimestamp: event.target.value })} required /></label><label>Prize pool<input type="number" min="0" value={createForm.prizePool} onChange={(event) => setCreateForm({ ...createForm, prizePool: event.target.value })} placeholder="Optional" /></label><label>Description<textarea value={createForm.description} onChange={(event) => setCreateForm({ ...createForm, description: event.target.value })} placeholder="Per kill 20 Rs..." rows="3" /></label><button type="submit">Create match</button></form></section>
         <section className="admin-card admin-match-lookup"><h2>Match control</h2><p>Enter a public ID such as #000001 to inspect players and edit settings.</p><div className="admin-lookup-row"><input value={matchLookup} onChange={(event) => setMatchLookup(event.target.value)} placeholder="#000001" /><button type="button" onClick={() => selectMatch(matchLookup)}>Open match</button></div></section>
         {currentSelectedMatch && <MatchControl match={currentSelectedMatch} entries={overview.entries.filter((entry) => entry.match_id === currentSelectedMatch.match_id)} kills={overview.kills.filter((item) => item.match_id === currentSelectedMatch.match_id)} form={matchForm} setForm={setMatchForm} onSubmit={submitMatchUpdate} onDelete={deleteSelectedMatch} />}
-        <DataTable title="Registered matches" columns={['public_id', 'mode', 'entry_fee', 'team_count', 'match_timestamp', 'prize_pool', 'status', 'winner_team_key']} rows={filteredMatches} onRowClick={(row) => selectMatch(row.public_id || row.match_id)} />
+        <DataTable title="Registered matches" columns={['public_id', 'mode', 'entry_fee', 'joined', 'starts', 'prize_pool', 'status', 'winner_team_key']} rows={filteredMatches} onRowClick={(row) => selectMatch(row.public_id || row.match_id)} />
       </>}
 
       {tab === 'users' && <>

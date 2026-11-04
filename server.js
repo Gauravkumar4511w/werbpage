@@ -1,5 +1,4 @@
-/* global process, Buffer */
-import crypto from 'node:crypto'
+/* global process */
 import http from 'node:http'
 import { fileURLToPath } from 'node:url'
 import {
@@ -75,19 +74,6 @@ async function readBody(request) {
   } catch {
     return {}
   }
-}
-
-function razorpayAuth() {
-  return `Basic ${Buffer.from(`${process.env.RAZORPAY_KEY_ID}:${process.env.RAZORPAY_KEY_SECRET}`).toString('base64')}`
-}
-
-function hasRazorpayConfig() {
-  return Boolean(
-    process.env.RAZORPAY_KEY_ID &&
-    process.env.RAZORPAY_KEY_SECRET &&
-    !process.env.RAZORPAY_KEY_ID.startsWith('your_') &&
-    !process.env.RAZORPAY_KEY_SECRET.startsWith('your_'),
-  )
 }
 
 function sendError(response, error, fallbackMessage) {
@@ -335,7 +321,13 @@ async function handleApiRequest(request, response) {
     if (!await requireAdmin(request, response)) return
     try {
       const body = await readBody(request)
-      let user = await registerOrUpdateUser({ ...body, status: 'active' }, { trusted: true })
+      // The admin gives the player a password, so the account can be logged into (and nobody else
+      // can claim it). Without one, an email account is taken over by whoever signs up with that email.
+      const password = String(body.password || '')
+      if (password && password.trim().length < 6) throw new Error('The password must be at least 6 characters.')
+      const key = String(body.userKey || '').trim()
+      const contact = key.includes('@') ? { email: key.toLowerCase() } : { phone: key }
+      let user = await registerOrUpdateUser({ ...contact, userKey: key, displayName: body.displayName, password, status: 'active' }, { trusted: true })
       const openingCoins = Number(body.creditCoins) || 0
       if (openingCoins > 0) {
         user = await adjustUserBalance({ userKey: user.user_key, amount: openingCoins, wallet: 'credit', note: 'Opening balance' })
@@ -482,73 +474,6 @@ async function handleApiRequest(request, response) {
       sendJson(response, 201, { recorded: true, ...await recordWithdrawalRequest(await readBody(request)) })
     } catch (error) {
       sendError(response, error, 'Could not record withdrawal request.')
-    }
-    return
-  }
-
-  if (request.method === 'POST' && pathname === '/api/payments/razorpay/order') {
-    if (!hasRazorpayConfig()) {
-      sendJson(response, 503, { message: 'Razorpay is not configured. Add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to .env.' })
-      return
-    }
-
-    try {
-      const body = await readBody(request)
-      const coins = Number(body.coins)
-      if (!Number.isInteger(coins) || coins < 50) {
-        sendJson(response, 400, { message: 'Buy at least 50 whole coins.' })
-        return
-      }
-
-      const razorpayResponse = await fetch('https://api.razorpay.com/v1/orders', {
-        method: 'POST',
-        headers: { Authorization: razorpayAuth(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: coins * 100, currency: 'INR', receipt: `arenacore-${Date.now()}`, notes: { coins: String(coins) } }),
-      })
-      const data = await razorpayResponse.json()
-      if (!razorpayResponse.ok) {
-        sendJson(response, 502, { message: data.error?.description || 'Could not create Razorpay order.' })
-        return
-      }
-      sendJson(response, 200, { orderId: data.id, amount: data.amount, currency: data.currency, coins })
-    } catch (error) {
-      sendJson(response, 502, { message: error instanceof Error ? error.message : 'Could not create payment order.' })
-    }
-    return
-  }
-
-  if (request.method === 'POST' && pathname === '/api/payments/razorpay/verify') {
-    try {
-      const body = await readBody(request)
-      const { razorpay_order_id: orderId, razorpay_payment_id: paymentId, razorpay_signature: signature } = body
-      if (!orderId || !paymentId || !signature || !process.env.RAZORPAY_KEY_SECRET) {
-        sendJson(response, 400, { message: 'Incomplete payment verification data.' })
-        return
-      }
-
-      const expectedSignature = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET).update(`${orderId}|${paymentId}`).digest('hex')
-      const providedSignature = Buffer.from(signature)
-      const calculatedSignature = Buffer.from(expectedSignature)
-      if (providedSignature.length !== calculatedSignature.length || !crypto.timingSafeEqual(providedSignature, calculatedSignature)) {
-        sendJson(response, 400, { message: 'Payment signature could not be verified.' })
-        return
-      }
-
-      const paymentResponse = await fetch(`https://api.razorpay.com/v1/payments/${encodeURIComponent(paymentId)}`, { headers: { Authorization: razorpayAuth() } })
-      const payment = await paymentResponse.json()
-      if (!paymentResponse.ok || payment.order_id !== orderId || payment.status !== 'captured') {
-        sendJson(response, 400, { message: 'Payment is not captured yet.' })
-        return
-      }
-
-      const coins = Number(payment.amount) / 100
-      if (!Number.isInteger(coins) || coins < 50) {
-        sendJson(response, 400, { message: 'Invalid payment amount.' })
-        return
-      }
-      sendJson(response, 200, { verified: true, paymentId, coins })
-    } catch (error) {
-      sendJson(response, 502, { message: error instanceof Error ? error.message : 'Payment verification failed.' })
     }
     return
   }
