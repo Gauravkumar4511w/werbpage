@@ -11,11 +11,15 @@ const defaultFees = DEFAULT_ENTRY_FEES
 const adminTitle = 'ADMIN DESK · ARENACORE'
 const CURRENT_MATCH_WINDOW_MS = 2 * 60 * 60 * 1000
 
-// datetime-local inputs show local time; toISOString() is UTC and shifted IST matches by 5.5 hours on save.
+// Match times are entered and shown in India time, whatever time zone the admin's device uses;
+// reading the box as device time saved a match hours off (and on the wrong day) outside India.
+const IST_OFFSET_MS = 330 * 60 * 1000
 function toLocalInputValue(timestamp) {
   if (!timestamp) return ''
-  const date = new Date(timestamp)
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+  return new Date(Number(timestamp) + IST_OFFSET_MS).toISOString().slice(0, 16)
+}
+function fromIstInputValue(value) {
+  return value ? Date.parse(`${value}:00Z`) - IST_OFFSET_MS : ''
 }
 
 function playAlertSound() {
@@ -416,7 +420,7 @@ function AdminPanel({ onBack }) {
         body: JSON.stringify({
           matchId: selectedMatch.match_id,
           entryFee: Number(matchForm.entryFee),
-          matchTimestamp: matchForm.matchTimestamp ? new Date(matchForm.matchTimestamp).getTime() : '',
+          matchTimestamp: fromIstInputValue(matchForm.matchTimestamp),
           prizePool: matchForm.prizePool === '' ? '' : Number(matchForm.prizePool),
           description: matchForm.description,
           roomId: matchForm.roomId,
@@ -448,7 +452,7 @@ function AdminPanel({ onBack }) {
         body: JSON.stringify({
           ...createForm,
           entryFee: Number(createForm.entryFee),
-          matchTimestamp: new Date(createForm.matchTimestamp).getTime(),
+          matchTimestamp: fromIstInputValue(createForm.matchTimestamp),
           prizePool: createForm.prizePool === '' ? null : Number(createForm.prizePool),
         }),
       })
@@ -533,7 +537,7 @@ function AdminPanel({ onBack }) {
   const matchDays = [...new Set(overview.matches.map((match) => match.match_day).filter(Boolean))].sort().reverse()
   const inSelectedDay = (match) => (matchDay === 'all' ? true : matchDay === 'today' ? isCurrentMatch(match) : match.match_day === matchDay)
   const currentMatchCount = overview.matches.filter(isCurrentMatch).length
-  const filteredMatches = overview.matches.filter((match) => inSelectedDay(match) && searchable(match))
+  const filteredMatches = overview.matches.filter(inSelectedDay)
     .sort((a, b) => String(b.match_day).localeCompare(String(a.match_day)) || Number(a.day_no) - Number(b.day_no))
     .map((match) => {
       const winnerNo = match.winner_team_key && overview.entries.find((entry) => entry.match_id === match.match_id && entry.team_key === match.winner_team_key)?.team_no
@@ -546,6 +550,8 @@ function AdminPanel({ onBack }) {
         winner: match.winner_team_key ? `${winnerNo ? `#${winnerNo} · ` : ''}${match.winner_team_key}` : '-',
       }
     })
+    // Searched after "#05", "8:00 pm" and the day are added, so those can be typed into the search.
+    .filter(searchable)
   const currentSelectedMatch = selectedMatch
     ? overview.matches.find((match) => match.match_id === selectedMatch.match_id) || selectedMatch
     : null
@@ -661,7 +667,7 @@ function AdminPanel({ onBack }) {
       {tab === 'withdrawals' && <WithdrawalReviewTable rows={filteredWithdrawals} busy={busy} highlight={highlight} onReview={reviewWithdrawal} onOpenUser={openUser} onViewUpload={viewUpload} />}
 
       {tab === 'matches' && <>
-        <section className="admin-card admin-create-match"><h2>Create new match</h2><p>Select any available mode, choose its time, and publish a custom prize.</p><form className="admin-create-form" onSubmit={submitCreateMatch}><label>Mode<select value={createForm.mode} onChange={(event) => setCreateForm({ ...createForm, mode: event.target.value, entryFee: String(defaultFees[event.target.value]) })}>{matchModes.map((mode) => <option key={mode} value={mode}>{mode}</option>)}</select></label><label>Entry fee<input type="number" min="1" value={createForm.entryFee} onChange={(event) => setCreateForm({ ...createForm, entryFee: event.target.value })} required /></label><label>Date and time<input type="datetime-local" value={createForm.matchTimestamp} onChange={(event) => setCreateForm({ ...createForm, matchTimestamp: event.target.value })} required /></label><label>Prize pool<input type="number" min="0" value={createForm.prizePool} onChange={(event) => setCreateForm({ ...createForm, prizePool: event.target.value })} placeholder="Optional" /></label><label>Description<textarea value={createForm.description} onChange={(event) => setCreateForm({ ...createForm, description: event.target.value })} placeholder="Per kill 20 Rs..." rows="3" /></label><button type="submit">Create match</button></form></section>
+        <section className="admin-card admin-create-match"><h2>Create new match</h2><p>Select any available mode, choose its time, and publish a custom prize.</p><form className="admin-create-form" onSubmit={submitCreateMatch}><label>Mode<select value={createForm.mode} onChange={(event) => setCreateForm({ ...createForm, mode: event.target.value, entryFee: String(defaultFees[event.target.value]) })}>{matchModes.map((mode) => <option key={mode} value={mode}>{mode}</option>)}</select></label><label>Entry fee<input type="number" min="1" value={createForm.entryFee} onChange={(event) => setCreateForm({ ...createForm, entryFee: event.target.value })} required /></label><label>Date and time (India time)<input type="datetime-local" value={createForm.matchTimestamp} onChange={(event) => setCreateForm({ ...createForm, matchTimestamp: event.target.value })} required /></label><label>Prize pool<input type="number" min="0" value={createForm.prizePool} onChange={(event) => setCreateForm({ ...createForm, prizePool: event.target.value })} placeholder="Optional" /></label><label>Description<textarea value={createForm.description} onChange={(event) => setCreateForm({ ...createForm, description: event.target.value })} placeholder="Per kill 20 Rs..." rows="3" /></label><button type="submit">Create match</button></form></section>
         <section className="admin-card admin-match-lookup"><h2>Match control</h2><p>Enter a match number such as #05 (today&apos;s match 5) to see its teams, declare the winner and edit it.</p><div className="admin-lookup-row"><input value={matchLookup} onChange={(event) => setMatchLookup(event.target.value)} placeholder="#05" /><button type="button" onClick={() => selectMatch(matchLookup)}>Open match</button></div></section>
         {currentSelectedMatch && <MatchControl match={currentSelectedMatch} entries={overview.entries.filter((entry) => entry.match_id === currentSelectedMatch.match_id)} kills={overview.kills.filter((item) => item.match_id === currentSelectedMatch.match_id)} form={matchForm} setForm={setMatchForm} onSubmit={submitMatchUpdate} onDelete={deleteSelectedMatch} onOpenUser={openUser} onDeclareWinner={(teamNo) => declareWinner(currentSelectedMatch.match_id, teamNo)} />}
         <div className="admin-filter-row admin-day-filter">
@@ -815,7 +821,7 @@ function MatchControl({ match, entries, kills, form, setForm, onSubmit, onDelete
             </form>
           )}
         </div>
-        <form className="admin-match-form" onSubmit={onSubmit}><label>Entry fee<input type="number" min="1" value={form.entryFee} onChange={(event) => setForm({ ...form, entryFee: event.target.value })} required /></label><label>Match time<input type="datetime-local" value={form.matchTimestamp} onChange={(event) => setForm({ ...form, matchTimestamp: event.target.value })} /></label><label>Prize payout override<input type="number" min="0" value={form.prizePool} onChange={(event) => setForm({ ...form, prizePool: event.target.value })} placeholder="Default: 80% pool" /></label><label>Match description<textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Per kill 20 Rs... or Prize pool 40 Rs..." rows="4" /></label><label>Room ID<input value={form.roomId} onChange={(event) => setForm({ ...form, roomId: event.target.value })} placeholder="Shown to joined players 10 min before start" maxLength={40} /></label><label>Room password<input value={form.roomPassword} onChange={(event) => setForm({ ...form, roomPassword: event.target.value })} placeholder="Room password" maxLength={40} /></label><button type="submit">Save match changes</button></form>
+        <form className="admin-match-form" onSubmit={onSubmit}><label>Entry fee<input type="number" min="1" value={form.entryFee} onChange={(event) => setForm({ ...form, entryFee: event.target.value })} required /></label><label>Match time (India time)<input type="datetime-local" value={form.matchTimestamp} onChange={(event) => setForm({ ...form, matchTimestamp: event.target.value })} /></label><label>Prize payout override<input type="number" min="0" value={form.prizePool} onChange={(event) => setForm({ ...form, prizePool: event.target.value })} placeholder="Default: 80% pool" /></label><label>Match description<textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Per kill 20 Rs... or Prize pool 40 Rs..." rows="4" /></label><label>Room ID<input value={form.roomId} onChange={(event) => setForm({ ...form, roomId: event.target.value })} placeholder="Shown to joined players 10 min before start" maxLength={40} /></label><label>Room password<input value={form.roomPassword} onChange={(event) => setForm({ ...form, roomPassword: event.target.value })} placeholder="Room password" maxLength={40} /></label><button type="submit">Save match changes</button></form>
       </div>
     </section>
   )
