@@ -11,6 +11,10 @@ const defaultFees = DEFAULT_ENTRY_FEES
 const adminTitle = 'ADMIN DESK · ARENACORE'
 const CURRENT_MATCH_WINDOW_MS = 2 * 60 * 60 * 1000
 const AWAITING_RESULT_WINDOW_MS = 2 * 24 * 60 * 60 * 1000
+// Joined players see the room 10 minutes before the start, so it should be set well before that.
+const ROOM_WARNING_WINDOW_MS = 2 * 60 * 60 * 1000
+const ROOM_REVEAL_WARNING_MS = 10 * 60 * 1000
+const matchStateLabels = { upcoming: 'Upcoming', result: 'Needs result', done: 'Done', empty: 'No players' }
 
 // Match times are entered and shown in India time, whatever time zone the admin's device uses;
 // reading the box as device time saved a match hours off (and on the wrong day) outside India.
@@ -84,6 +88,8 @@ function AdminPanel({ onBack }) {
   const [matchLookup, setMatchLookup] = useState('')
   // Which matches the table lists: 'today' (today's and upcoming), 'all', or one India date (YYYY-MM-DD).
   const [matchDay, setMatchDay] = useState('today')
+  // Which match states the table lists: 'all', 'upcoming', 'result' (started, needs a winner) or 'done'.
+  const [matchState, setMatchState] = useState('all')
   // When the overview was last loaded; the 5 s refresh keeps it current, so "today" rolls over at midnight.
   const [loadedAt, setLoadedAt] = useState(() => Date.now())
   const [selectedMatch, setSelectedMatch] = useState(null)
@@ -368,6 +374,17 @@ function AdminPanel({ onBack }) {
   const formMatch = (form) => (form.matchKey ? overview.matches.find((item) => item.match_id === form.matchKey) : String(form.matchId || '').trim() ? findMatchById(form.matchId) : null) || null
   const teamsOf = (match) => (match ? groupTeams(overview.entries.filter((entry) => entry.match_id === match.match_id), overview.kills.filter((item) => item.match_id === match.match_id)) : [])
 
+  // From "Room ID needed": opens the match in Match control with the room ID box focused.
+  const openMatchRoom = (match) => {
+    setTab('matches')
+    selectMatch(match.match_id)
+    window.setTimeout(() => {
+      const input = document.querySelector('.admin-match-form input[name="roomId"]')
+      input?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      input?.focus({ preventScroll: true })
+    }, 80)
+  }
+
   // From "Matches waiting for a result": fills a card with that exact match and scrolls to it.
   const startResult = (match) => {
     setResultForm({ matchId: formatMatchLabel(match), matchKey: match.match_id, winnerTeamNo: '' })
@@ -566,7 +583,14 @@ function AdminPanel({ onBack }) {
   const matchDays = [...new Set(overview.matches.map((match) => match.match_day).filter(Boolean))].sort().reverse()
   const inSelectedDay = (match) => (matchDay === 'all' ? true : matchDay === 'today' ? isCurrentMatch(match) : match.match_day === matchDay)
   const currentMatchCount = overview.matches.filter(isCurrentMatch).length
-  const filteredMatches = overview.matches.filter(inSelectedDay)
+  const stateOf = (match) => {
+    if (match.status === 'confirmed') return 'done'
+    if (Number(match.match_timestamp) > now) return 'upcoming'
+    return joinedTeams(match.match_id) > 0 ? 'result' : 'empty'
+  }
+  const dayMatches = overview.matches.filter(inSelectedDay)
+  const stateCounts = dayMatches.reduce((counts, match) => ({ ...counts, [stateOf(match)]: (counts[stateOf(match)] || 0) + 1 }), {})
+  const filteredMatches = dayMatches.filter((match) => matchState === 'all' || stateOf(match) === matchState)
     .sort((a, b) => String(b.match_day).localeCompare(String(a.match_day)) || Number(a.day_no) - Number(b.day_no))
     .map((match) => {
       const winnerNo = match.winner_team_key && overview.entries.find((entry) => entry.match_id === match.match_id && entry.team_key === match.winner_team_key)?.team_no
@@ -576,6 +600,8 @@ function AdminPanel({ onBack }) {
         day: match.match_day === today ? 'Today' : formatDay(match.match_day),
         time: formatTime(match.match_timestamp),
         joined: `${joinedTeams(match.match_id)}/${getMatchCapacity(match.mode).total}`,
+        state: matchStateLabels[stateOf(match)],
+        room: match.room_id ? 'Set' : '-',
         winner: match.winner_team_key ? `${winnerNo ? `#${winnerNo} · ` : ''}${match.winner_team_key}` : '-',
       }
     })
@@ -585,6 +611,14 @@ function AdminPanel({ onBack }) {
   const awaitingResult = overview.matches
     .filter((match) => match.status !== 'confirmed' && Number(match.match_timestamp) <= now && Number(match.match_timestamp) >= now - AWAITING_RESULT_WINDOW_MS && joinedTeams(match.match_id) > 0)
     .sort((a, b) => Number(a.match_timestamp) - Number(b.match_timestamp))
+  // Starting in the next two hours with players joined, but no room ID or password yet.
+  const roomNeeded = overview.matches
+    .filter((match) => match.status !== 'confirmed' && Number(match.match_timestamp) > now && Number(match.match_timestamp) <= now + ROOM_WARNING_WINDOW_MS && joinedTeams(match.match_id) > 0 && (!match.room_id || !match.room_password))
+    .sort((a, b) => Number(a.match_timestamp) - Number(b.match_timestamp))
+  const startsIn = (match) => {
+    const minutes = Math.max(0, Math.round((Number(match.match_timestamp) - now) / 60000))
+    return minutes >= 60 ? `${Math.floor(minutes / 60)} h ${minutes % 60} min` : `${minutes} min`
+  }
   const resultMatch = formMatch(resultForm)
   const resultTeams = teamsOf(resultMatch)
   const killMatch = formMatch(killForm)
@@ -685,6 +719,28 @@ function AdminPanel({ onBack }) {
 
       {tab === 'overview' && <>
         <PaymentReviewTable title="Top-ups waiting for verification" rows={pendingPayments} busy={busy} highlight={highlight} onReview={reviewPayment} onOpenUser={openUser} onViewUpload={viewUpload} emptyText="No top-ups are waiting. New UTR submissions appear here and in Alerts." />
+        {roomNeeded.length > 0 && (
+          <section className="admin-table-card admin-room-needed">
+            <div className="admin-card-heading"><h2>Room ID needed</h2><span>{roomNeeded.length} starting soon</span></div>
+            <p className="admin-empty-note">Joined players see the room ID and password 10 minutes before the start. Set them before then.</p>
+            <div className="admin-table-wrap">
+              <table>
+                <thead><tr><th>Match</th><th>Next step</th><th>Starts in</th><th>Teams</th><th>Mode</th></tr></thead>
+                <tbody>
+                  {roomNeeded.map((match) => (
+                    <tr key={match.match_id} className={Number(match.match_timestamp) - now <= ROOM_REVEAL_WARNING_MS ? 'is-urgent' : ''}>
+                      <td><strong>{formatMatchLabel(match)}</strong></td>
+                      <td><div className="admin-row-actions"><button type="button" className="is-primary" onClick={() => openMatchRoom(match)}>Set room</button></div></td>
+                      <td>{startsIn(match)} · {formatTime(match.match_timestamp)}</td>
+                      <td>{joinedTeams(match.match_id)}</td>
+                      <td>{match.mode}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
         <section className="admin-table-card admin-awaiting">
           <div className="admin-card-heading"><h2>Matches waiting for a result</h2><span>{awaitingResult.length} {awaitingResult.length === 1 ? 'match' : 'matches'}</span></div>
           {awaitingResult.length ? (
@@ -759,7 +815,14 @@ function AdminPanel({ onBack }) {
       {tab === 'matches' && <>
         <section className="admin-card admin-create-match"><h2>Create new match</h2><p>Select any available mode, choose its time, and publish a custom prize.</p><form className="admin-create-form" onSubmit={submitCreateMatch}><label>Mode<select value={createForm.mode} onChange={(event) => setCreateForm({ ...createForm, mode: event.target.value, entryFee: String(defaultFees[event.target.value]) })}>{matchModes.map((mode) => <option key={mode} value={mode}>{mode}</option>)}</select></label><label>Entry fee<input type="number" min="1" value={createForm.entryFee} onChange={(event) => setCreateForm({ ...createForm, entryFee: event.target.value })} required /></label><label>Date and time (India time)<input type="datetime-local" value={createForm.matchTimestamp} onChange={(event) => setCreateForm({ ...createForm, matchTimestamp: event.target.value })} required /></label><label>Prize pool<input type="number" min="0" value={createForm.prizePool} onChange={(event) => setCreateForm({ ...createForm, prizePool: event.target.value })} placeholder="Optional" /></label><label>Description<textarea value={createForm.description} onChange={(event) => setCreateForm({ ...createForm, description: event.target.value })} placeholder="Per kill 20 Rs..." rows="3" /></label><button type="submit">Create match</button></form></section>
         <section className="admin-card admin-match-lookup"><h2>Match control</h2><p>Enter a match number such as #05 (today&apos;s match 5) to see its teams, declare the winner and edit it.</p><div className="admin-lookup-row"><input value={matchLookup} onChange={(event) => setMatchLookup(event.target.value)} placeholder="#05" /><button type="button" onClick={() => selectMatch(matchLookup)}>Open match</button></div></section>
-        {currentSelectedMatch && <MatchControl match={currentSelectedMatch} entries={overview.entries.filter((entry) => entry.match_id === currentSelectedMatch.match_id)} kills={overview.kills.filter((item) => item.match_id === currentSelectedMatch.match_id)} form={matchForm} setForm={editMatchForm} saveState={matchSaveState} onSubmit={submitMatchUpdate} onDelete={deleteSelectedMatch} onOpenUser={openUser} onDeclareWinner={(teamNo) => declareWinner(currentSelectedMatch.match_id, teamNo)} />}
+        {currentSelectedMatch && <MatchControl key={currentSelectedMatch.match_id} match={currentSelectedMatch} entries={overview.entries.filter((entry) => entry.match_id === currentSelectedMatch.match_id)} kills={overview.kills.filter((item) => item.match_id === currentSelectedMatch.match_id)} form={matchForm} setForm={editMatchForm} saveState={matchSaveState} onSubmit={submitMatchUpdate} onDelete={deleteSelectedMatch} onOpenUser={openUser} onDeclareWinner={(teamNo) => declareWinner(currentSelectedMatch.match_id, teamNo)} />}
+        <div className="admin-filter-row admin-state-filter">
+          {[['all', 'All'], ['upcoming', 'Upcoming'], ['result', 'Needs result'], ['done', 'Done']].map(([value, label]) => (
+            <button key={value} type="button" className={matchState === value ? 'selected' : ''} onClick={() => setMatchState(value)}>
+              {label}{value !== 'all' && <span className="admin-filter-count">{stateCounts[value] || 0}</span>}
+            </button>
+          ))}
+        </div>
         <div className="admin-filter-row admin-day-filter">
           <button type="button" className={matchDay === 'today' ? 'selected' : ''} onClick={() => setMatchDay('today')}>Today &amp; upcoming</button>
           <button type="button" className={matchDay === 'all' ? 'selected' : ''} onClick={() => setMatchDay('all')}>All days</button>
@@ -768,7 +831,7 @@ function AdminPanel({ onBack }) {
             {matchDays.map((day) => <option key={day} value={day}>{day === today ? 'Today' : formatDay(day)}</option>)}
           </select>
         </div>
-        <DataTable title={`Matches · ${matchDay === 'today' ? 'today' : matchDay === 'all' ? 'all days' : formatDay(matchDay)} · tap a row to open it`} columns={['no', 'time', 'day', 'mode', 'entry_fee', 'joined', 'prize_pool', 'status', 'winner']} rows={filteredMatches} onRowClick={(row) => selectMatch(row.match_id)} />
+        <DataTable title={`Matches · ${matchDay === 'today' ? 'today' : matchDay === 'all' ? 'all days' : formatDay(matchDay)} · tap a row to open it`} columns={['no', 'time', 'day', 'mode', 'state', 'joined', 'entry_fee', 'room', 'winner']} rows={filteredMatches} onRowClick={(row) => selectMatch(row.match_id)} />
       </>}
 
       {tab === 'users' && <>
@@ -921,6 +984,8 @@ function MatchControl({ match, entries, kills, form, setForm, saveState = 'idle'
   const [winnerNo, setWinnerNo] = useState('')
   const teams = groupTeams(entries, kills)
   const winner = match.status === 'confirmed' ? teams.find((team) => team.teamKey === match.winner_team_key) : null
+  const canPick = match.status !== 'confirmed'
+  const pickTeam = (team) => { if (canPick) setWinnerNo(String(team.teamNo)) }
   const declare = async (event) => {
     event.preventDefault()
     if (await onDeclareWinner(winnerNo)) setWinnerNo('')
@@ -934,12 +999,20 @@ function MatchControl({ match, entries, kills, form, setForm, saveState = 'idle'
       </div>
       <div className="admin-match-columns">
         <div>
-          <h3>Joined teams</h3>
+          <h3>Joined teams{canPick && teams.length > 0 ? ' · tap the winning team' : ''}</h3>
           <div className="admin-player-list">
             {teams.length ? teams.map((team) => (
-              <div key={team.teamNo} className={winner?.teamNo === team.teamNo ? 'is-winner' : ''}>
+              <div
+                key={team.teamNo}
+                className={`${winner?.teamNo === team.teamNo ? 'is-winner' : ''} ${canPick ? 'is-pickable' : ''} ${canPick && Number(winnerNo) === team.teamNo ? 'is-selected' : ''}`}
+                onClick={() => pickTeam(team)}
+                onKeyDown={(event) => { if (canPick && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); pickTeam(team) } }}
+                role={canPick ? 'button' : undefined}
+                tabIndex={canPick ? 0 : undefined}
+                aria-pressed={canPick ? Number(winnerNo) === team.teamNo : undefined}
+              >
                 <b className="admin-team-no">#{team.teamNo || '?'}</b>
-                <strong><button type="button" className="admin-user-link" onClick={() => onOpenUser(team.members[0].user_key)}>{team.teamKey}</button></strong>
+                <strong><button type="button" className="admin-user-link" onClick={(event) => { event.stopPropagation(); onOpenUser(team.members[0].user_key) }}>{team.teamKey}</button></strong>
                 <span>{team.members.flatMap((entry) => (entry.identifiers?.length ? entry.identifiers : [entry.user_key])).join(', ')}</span>
                 <small>{team.members.reduce((total, entry) => total + (kills.find((item) => item.user_key === entry.user_key)?.kills || 0), 0)} kills{winner?.teamNo === team.teamNo ? ' · WINNER' : ''}</small>
               </div>
@@ -952,11 +1025,11 @@ function MatchControl({ match, entries, kills, form, setForm, saveState = 'idle'
               <label>Winning team no.
                 <input type="number" min="1" max={teams.length} step="1" inputMode="numeric" value={winnerNo} onChange={(event) => setWinnerNo(event.target.value)} placeholder={`1 to ${teams.length}`} required />
               </label>
-              <button type="submit">Declare winner and pay</button>
+              <button type="submit">{winnerNo ? `Declare team #${winnerNo} winner and pay` : 'Declare winner and pay'}</button>
             </form>
           )}
         </div>
-        <form className="admin-match-form" onSubmit={onSubmit}><label>Entry fee<input type="number" min="1" value={form.entryFee} onChange={(event) => setForm({ ...form, entryFee: event.target.value })} required /></label><label>Match time (India time)<input type="datetime-local" value={form.matchTimestamp} onChange={(event) => setForm({ ...form, matchTimestamp: event.target.value })} /></label><label>Prize payout override<input type="number" min="0" value={form.prizePool} onChange={(event) => setForm({ ...form, prizePool: event.target.value })} placeholder="Default: 80% pool" /></label><label>Match description<textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Per kill 20 Rs... or Prize pool 40 Rs..." rows="4" /></label><label>Room ID<input value={form.roomId} onChange={(event) => setForm({ ...form, roomId: event.target.value })} placeholder="Shown to joined players 10 min before start" maxLength={40} /></label><label>Room password<input value={form.roomPassword} onChange={(event) => setForm({ ...form, roomPassword: event.target.value })} placeholder="Room password" maxLength={40} /></label><button type="submit" className={`admin-save-button is-${saveState}`} disabled={saveState === 'saving'} aria-live="polite">{saveButtonLabels[saveState]}</button></form>
+        <form className="admin-match-form" onSubmit={onSubmit}><label>Entry fee<input type="number" min="1" value={form.entryFee} onChange={(event) => setForm({ ...form, entryFee: event.target.value })} required /></label><label>Match time (India time)<input type="datetime-local" value={form.matchTimestamp} onChange={(event) => setForm({ ...form, matchTimestamp: event.target.value })} /></label><label>Prize payout override<input type="number" min="0" value={form.prizePool} onChange={(event) => setForm({ ...form, prizePool: event.target.value })} placeholder="Default: 80% pool" /></label><label>Match description<textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Per kill 20 Rs... or Prize pool 40 Rs..." rows="4" /></label><label>Room ID<input name="roomId" value={form.roomId} onChange={(event) => setForm({ ...form, roomId: event.target.value })} placeholder="Shown to joined players 10 min before start" maxLength={40} /></label><label>Room password<input value={form.roomPassword} onChange={(event) => setForm({ ...form, roomPassword: event.target.value })} placeholder="Room password" maxLength={40} /></label><button type="submit" className={`admin-save-button is-${saveState}`} disabled={saveState === 'saving'} aria-live="polite">{saveButtonLabels[saveState]}</button></form>
       </div>
     </section>
   )
