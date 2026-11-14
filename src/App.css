@@ -911,7 +911,20 @@ body { background: #07111c; }
 .admin-row-actions button.is-primary { border-color: #ff765b; color: #171216; background: #ff765b; }
 .admin-row-actions button.is-primary:hover { color: #171216; background: #ff927d; }
 .admin-empty-note { margin: 0; color: #8d929c; font-size: 11px; }
-.admin-day-filter { flex-wrap: wrap; align-items: center; margin-top: 14px; }
+.admin-state-filter { flex-wrap: wrap; margin-top: 14px; margin-bottom: 6px; }
+.admin-filter-count { margin-left: 6px; padding: 1px 5px; border-radius: 8px; color: #171216; background: #8d929c; font-size: 8px; }
+.admin-filter-row button.selected .admin-filter-count { background: #f7d889; }
+
+/* Match control: tap a joined team to pick the winner. */
+.admin-player-list > div.is-pickable { cursor: pointer; }
+.admin-player-list > div.is-pickable:hover, .admin-player-list > div.is-pickable:focus-visible { border-color: #67d6ff; background: rgba(103,214,255,.06); outline: 0; }
+.admin-player-list > div.is-selected { border-color: #67d6ff; background: rgba(103,214,255,.12); box-shadow: inset 3px 0 0 #67d6ff; }
+/* Overview: matches starting soon without a room ID. */
+.admin-room-needed { margin-bottom: 14px; border-color: rgba(247,216,137,.45); }
+.admin-room-needed .admin-empty-note { margin-bottom: 10px; }
+.admin-room-needed tr.is-urgent td { color: #ff927d; }
+.admin-room-needed tr.is-urgent td strong { color: #ff765b; }
+.admin-day-filter { flex-wrap: wrap; align-items: center; margin-top: 6px; }
 .admin-day-filter select { border: 1px solid rgba(255,255,255,.14); padding: 7px 10px; color: #c9ccd2; background: #0e0f14; font-size: 10px; }
 
 .admin-review-card { margin-bottom: 14px; }
