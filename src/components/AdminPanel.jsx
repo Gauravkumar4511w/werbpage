@@ -9,12 +9,17 @@ const emptyOverview = { users: [], matches: [], entries: [], payments: [], withd
 const matchModes = MATCH_MODES
 const defaultFees = DEFAULT_ENTRY_FEES
 const adminTitle = 'ADMIN DESK · ARENACORE'
+const CURRENT_MATCH_WINDOW_MS = 2 * 60 * 60 * 1000
 
-// datetime-local inputs show local time; toISOString() is UTC and shifted IST matches by 5.5 hours on save.
+// Match times are entered and shown in India time, whatever time zone the admin's device uses;
+// reading the box as device time saved a match hours off (and on the wrong day) outside India.
+const IST_OFFSET_MS = 330 * 60 * 1000
 function toLocalInputValue(timestamp) {
   if (!timestamp) return ''
-  const date = new Date(timestamp)
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+  return new Date(Number(timestamp) + IST_OFFSET_MS).toISOString().slice(0, 16)
+}
+function fromIstInputValue(value) {
+  return value ? Date.parse(`${value}:00Z`) - IST_OFFSET_MS : ''
 }
 
 function playAlertSound() {
@@ -73,6 +78,10 @@ function AdminPanel({ onBack }) {
   const [killForm, setKillForm] = useState({ matchId: '', userKey: '', kills: '' })
   const [resultForm, setResultForm] = useState({ matchId: '', winnerTeamNo: '' })
   const [matchLookup, setMatchLookup] = useState('')
+  // Which matches the table lists: 'today' (today's and upcoming), 'all', or one India date (YYYY-MM-DD).
+  const [matchDay, setMatchDay] = useState('today')
+  // When the overview was last loaded; the 5 s refresh keeps it current, so "today" rolls over at midnight.
+  const [loadedAt, setLoadedAt] = useState(() => Date.now())
   const [selectedMatch, setSelectedMatch] = useState(null)
   const [matchForm, setMatchForm] = useState({ entryFee: '', matchTimestamp: '', prizePool: '', description: '', roomId: '', roomPassword: '' })
   const [createForm, setCreateForm] = useState({ mode: matchModes[0], entryFee: String(defaultFees[matchModes[0]]), matchTimestamp: '', prizePool: '', description: '' })
@@ -106,6 +115,7 @@ function AdminPanel({ onBack }) {
   const loadOverview = async () => {
     const data = await api('/api/admin/overview')
     setOverview(data)
+    setLoadedAt(Date.now())
     return data
   }
 
@@ -127,6 +137,7 @@ function AdminPanel({ onBack }) {
         if (!response.ok) throw new Error(data.message || 'Request failed.')
         if (!active) return
         setOverview(data)
+        setLoadedAt(Date.now())
 
         // Alert on every notification newer than the ones already seen in this tab.
         const notifications = data.notifications || []
@@ -409,7 +420,7 @@ function AdminPanel({ onBack }) {
         body: JSON.stringify({
           matchId: selectedMatch.match_id,
           entryFee: Number(matchForm.entryFee),
-          matchTimestamp: matchForm.matchTimestamp ? new Date(matchForm.matchTimestamp).getTime() : '',
+          matchTimestamp: fromIstInputValue(matchForm.matchTimestamp),
           prizePool: matchForm.prizePool === '' ? '' : Number(matchForm.prizePool),
           description: matchForm.description,
           roomId: matchForm.roomId,
@@ -441,7 +452,7 @@ function AdminPanel({ onBack }) {
         body: JSON.stringify({
           ...createForm,
           entryFee: Number(createForm.entryFee),
-          matchTimestamp: new Date(createForm.matchTimestamp).getTime(),
+          matchTimestamp: fromIstInputValue(createForm.matchTimestamp),
           prizePool: createForm.prizePool === '' ? null : Number(createForm.prizePool),
         }),
       })
@@ -517,9 +528,16 @@ function AdminPanel({ onBack }) {
   const filteredWithdrawals = overview.withdrawals.filter((item) => (reviewFilter === 'all' || item.status === 'pending') && searchable(item)).sort(byPendingFirst)
   // Newest start time first, with readable times and how many teams really joined.
   const joinedTeams = (matchId) => new Set(overview.entries.filter((entry) => entry.match_id === matchId).map((entry) => entry.team_key)).size
-  // Today's and earlier matches, newest day first and #01, #02... within a day, with the start time.
-  const today = getIndiaDate()
-  const filteredMatches = overview.matches.filter(searchable)
+  // By default only today's matches (and any still to come) are listed, so each new day starts
+  // with a fresh list. Matches that started in the last 2 hours stay, like last night's 1:20 AM one.
+  // Older days are one pick away in the day filter.
+  const now = loadedAt
+  const today = getIndiaDate(now)
+  const isCurrentMatch = (match) => match.match_day === today || Number(match.match_timestamp) >= now - CURRENT_MATCH_WINDOW_MS
+  const matchDays = [...new Set(overview.matches.map((match) => match.match_day).filter(Boolean))].sort().reverse()
+  const inSelectedDay = (match) => (matchDay === 'all' ? true : matchDay === 'today' ? isCurrentMatch(match) : match.match_day === matchDay)
+  const currentMatchCount = overview.matches.filter(isCurrentMatch).length
+  const filteredMatches = overview.matches.filter(inSelectedDay)
     .sort((a, b) => String(b.match_day).localeCompare(String(a.match_day)) || Number(a.day_no) - Number(b.day_no))
     .map((match) => {
       const winnerNo = match.winner_team_key && overview.entries.find((entry) => entry.match_id === match.match_id && entry.team_key === match.winner_team_key)?.team_no
@@ -532,6 +550,8 @@ function AdminPanel({ onBack }) {
         winner: match.winner_team_key ? `${winnerNo ? `#${winnerNo} · ` : ''}${match.winner_team_key}` : '-',
       }
     })
+    // Searched after "#05", "8:00 pm" and the day are added, so those can be typed into the search.
+    .filter(searchable)
   const currentSelectedMatch = selectedMatch
     ? overview.matches.find((match) => match.match_id === selectedMatch.match_id) || selectedMatch
     : null
@@ -609,7 +629,7 @@ function AdminPanel({ onBack }) {
         <div><span>Live Players</span><strong>{overview.liveCount ?? Math.max(overview.users.length, 1)}</strong><small>real-time active</small></div>
         <button type="button" className={pendingPayments.length ? 'needs-review' : ''} onClick={() => { setTab('payments'); setReviewFilter('pending') }}><span>Top-ups</span><strong>{pendingPayments.length}</strong><small>pending review</small></button>
         <button type="button" className={pendingWithdrawals.length ? 'needs-review' : ''} onClick={() => { setTab('withdrawals'); setReviewFilter('pending') }}><span>Withdrawals</span><strong>{pendingWithdrawals.length}</strong><small>pending review</small></button>
-        <div><span>Matches</span><strong>{overview.matches.length}</strong></div>
+        <button type="button" onClick={() => { setTab('matches'); setMatchDay('today') }}><span>Today&apos;s matches</span><strong>{currentMatchCount}</strong><small>{overview.matches.length} in total</small></button>
       </div>
 
       <div className="admin-toolbar">
@@ -647,10 +667,18 @@ function AdminPanel({ onBack }) {
       {tab === 'withdrawals' && <WithdrawalReviewTable rows={filteredWithdrawals} busy={busy} highlight={highlight} onReview={reviewWithdrawal} onOpenUser={openUser} onViewUpload={viewUpload} />}
 
       {tab === 'matches' && <>
-        <section className="admin-card admin-create-match"><h2>Create new match</h2><p>Select any available mode, choose its time, and publish a custom prize.</p><form className="admin-create-form" onSubmit={submitCreateMatch}><label>Mode<select value={createForm.mode} onChange={(event) => setCreateForm({ ...createForm, mode: event.target.value, entryFee: String(defaultFees[event.target.value]) })}>{matchModes.map((mode) => <option key={mode} value={mode}>{mode}</option>)}</select></label><label>Entry fee<input type="number" min="1" value={createForm.entryFee} onChange={(event) => setCreateForm({ ...createForm, entryFee: event.target.value })} required /></label><label>Date and time<input type="datetime-local" value={createForm.matchTimestamp} onChange={(event) => setCreateForm({ ...createForm, matchTimestamp: event.target.value })} required /></label><label>Prize pool<input type="number" min="0" value={createForm.prizePool} onChange={(event) => setCreateForm({ ...createForm, prizePool: event.target.value })} placeholder="Optional" /></label><label>Description<textarea value={createForm.description} onChange={(event) => setCreateForm({ ...createForm, description: event.target.value })} placeholder="Per kill 20 Rs..." rows="3" /></label><button type="submit">Create match</button></form></section>
+        <section className="admin-card admin-create-match"><h2>Create new match</h2><p>Select any available mode, choose its time, and publish a custom prize.</p><form className="admin-create-form" onSubmit={submitCreateMatch}><label>Mode<select value={createForm.mode} onChange={(event) => setCreateForm({ ...createForm, mode: event.target.value, entryFee: String(defaultFees[event.target.value]) })}>{matchModes.map((mode) => <option key={mode} value={mode}>{mode}</option>)}</select></label><label>Entry fee<input type="number" min="1" value={createForm.entryFee} onChange={(event) => setCreateForm({ ...createForm, entryFee: event.target.value })} required /></label><label>Date and time (India time)<input type="datetime-local" value={createForm.matchTimestamp} onChange={(event) => setCreateForm({ ...createForm, matchTimestamp: event.target.value })} required /></label><label>Prize pool<input type="number" min="0" value={createForm.prizePool} onChange={(event) => setCreateForm({ ...createForm, prizePool: event.target.value })} placeholder="Optional" /></label><label>Description<textarea value={createForm.description} onChange={(event) => setCreateForm({ ...createForm, description: event.target.value })} placeholder="Per kill 20 Rs..." rows="3" /></label><button type="submit">Create match</button></form></section>
         <section className="admin-card admin-match-lookup"><h2>Match control</h2><p>Enter a match number such as #05 (today&apos;s match 5) to see its teams, declare the winner and edit it.</p><div className="admin-lookup-row"><input value={matchLookup} onChange={(event) => setMatchLookup(event.target.value)} placeholder="#05" /><button type="button" onClick={() => selectMatch(matchLookup)}>Open match</button></div></section>
         {currentSelectedMatch && <MatchControl match={currentSelectedMatch} entries={overview.entries.filter((entry) => entry.match_id === currentSelectedMatch.match_id)} kills={overview.kills.filter((item) => item.match_id === currentSelectedMatch.match_id)} form={matchForm} setForm={setMatchForm} onSubmit={submitMatchUpdate} onDelete={deleteSelectedMatch} onOpenUser={openUser} onDeclareWinner={(teamNo) => declareWinner(currentSelectedMatch.match_id, teamNo)} />}
-        <DataTable title="Matches · tap a row to open it" columns={['no', 'time', 'day', 'mode', 'entry_fee', 'joined', 'prize_pool', 'status', 'winner']} rows={filteredMatches} onRowClick={(row) => selectMatch(row.match_id)} />
+        <div className="admin-filter-row admin-day-filter">
+          <button type="button" className={matchDay === 'today' ? 'selected' : ''} onClick={() => setMatchDay('today')}>Today &amp; upcoming</button>
+          <button type="button" className={matchDay === 'all' ? 'selected' : ''} onClick={() => setMatchDay('all')}>All days</button>
+          <select aria-label="Show matches of one day" value={matchDays.includes(matchDay) ? matchDay : ''} onChange={(event) => setMatchDay(event.target.value || 'today')}>
+            <option value="">Pick a past day…</option>
+            {matchDays.map((day) => <option key={day} value={day}>{day === today ? 'Today' : formatDay(day)}</option>)}
+          </select>
+        </div>
+        <DataTable title={`Matches · ${matchDay === 'today' ? 'today' : matchDay === 'all' ? 'all days' : formatDay(matchDay)} · tap a row to open it`} columns={['no', 'time', 'day', 'mode', 'entry_fee', 'joined', 'prize_pool', 'status', 'winner']} rows={filteredMatches} onRowClick={(row) => selectMatch(row.match_id)} />
       </>}
 
       {tab === 'users' && <>
@@ -793,7 +821,7 @@ function MatchControl({ match, entries, kills, form, setForm, onSubmit, onDelete
             </form>
           )}
         </div>
-        <form className="admin-match-form" onSubmit={onSubmit}><label>Entry fee<input type="number" min="1" value={form.entryFee} onChange={(event) => setForm({ ...form, entryFee: event.target.value })} required /></label><label>Match time<input type="datetime-local" value={form.matchTimestamp} onChange={(event) => setForm({ ...form, matchTimestamp: event.target.value })} /></label><label>Prize payout override<input type="number" min="0" value={form.prizePool} onChange={(event) => setForm({ ...form, prizePool: event.target.value })} placeholder="Default: 80% pool" /></label><label>Match description<textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Per kill 20 Rs... or Prize pool 40 Rs..." rows="4" /></label><label>Room ID<input value={form.roomId} onChange={(event) => setForm({ ...form, roomId: event.target.value })} placeholder="Shown to joined players 10 min before start" maxLength={40} /></label><label>Room password<input value={form.roomPassword} onChange={(event) => setForm({ ...form, roomPassword: event.target.value })} placeholder="Room password" maxLength={40} /></label><button type="submit">Save match changes</button></form>
+        <form className="admin-match-form" onSubmit={onSubmit}><label>Entry fee<input type="number" min="1" value={form.entryFee} onChange={(event) => setForm({ ...form, entryFee: event.target.value })} required /></label><label>Match time (India time)<input type="datetime-local" value={form.matchTimestamp} onChange={(event) => setForm({ ...form, matchTimestamp: event.target.value })} /></label><label>Prize payout override<input type="number" min="0" value={form.prizePool} onChange={(event) => setForm({ ...form, prizePool: event.target.value })} placeholder="Default: 80% pool" /></label><label>Match description<textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Per kill 20 Rs... or Prize pool 40 Rs..." rows="4" /></label><label>Room ID<input value={form.roomId} onChange={(event) => setForm({ ...form, roomId: event.target.value })} placeholder="Shown to joined players 10 min before start" maxLength={40} /></label><label>Room password<input value={form.roomPassword} onChange={(event) => setForm({ ...form, roomPassword: event.target.value })} placeholder="Room password" maxLength={40} /></label><button type="submit">Save match changes</button></form>
       </div>
     </section>
   )

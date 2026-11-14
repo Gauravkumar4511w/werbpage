@@ -161,7 +161,7 @@ async function handleApiRequest(request, response) {
       const payout = await confirmMatchResult(await readBody(request))
       sendJson(response, 200, { confirmed: true, payout })
     } catch (error) {
-      sendJson(response, 400, { message: error instanceof Error ? error.message : 'Could not confirm match result.' })
+      sendJson(response, error?.status || 400, { message: error instanceof Error ? error.message : 'Could not confirm match result.' })
     }
     return
   }
@@ -171,7 +171,7 @@ async function handleApiRequest(request, response) {
     try {
       sendJson(response, 200, { match: await updateMatchDetails(await readBody(request)) })
     } catch (error) {
-      sendJson(response, 400, { message: error instanceof Error ? error.message : 'Could not update match.' })
+      sendJson(response, error?.status || 400, { message: error instanceof Error ? error.message : 'Could not update match.' })
     }
     return
   }
@@ -327,14 +327,14 @@ async function handleApiRequest(request, response) {
       if (password && password.trim().length < 6) throw new Error('The password must be at least 6 characters.')
       const key = String(body.userKey || '').trim()
       const contact = key.includes('@') ? { email: key.toLowerCase() } : { phone: key }
-      let user = await registerOrUpdateUser({ ...contact, userKey: key, displayName: body.displayName, password, status: 'active' }, { trusted: true })
+      let user = await registerOrUpdateUser({ ...contact, userKey: key, displayName: body.displayName, password, status: 'active' }, { trusted: true, createOnly: true })
       const openingCoins = Number(body.creditCoins) || 0
       if (openingCoins > 0) {
         user = await adjustUserBalance({ userKey: user.user_key, amount: openingCoins, wallet: 'credit', note: 'Opening balance' })
       }
       sendJson(response, 201, { success: true, user })
     } catch (error) {
-      sendJson(response, 400, { message: error instanceof Error ? error.message : 'Could not create user.' })
+      sendJson(response, error?.status || 400, { message: error instanceof Error ? error.message : 'Could not create user.' })
     }
     return
   }

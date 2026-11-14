@@ -886,6 +886,8 @@ body { background: #07111c; }
 .admin-filter-row { display: flex; gap: 6px; margin-bottom: 12px; }
 .admin-filter-row button { border: 1px solid rgba(255,255,255,.14); padding: 7px 10px; color: #9fa2a9; background: transparent; font-size: 9px; text-transform: uppercase; cursor: pointer; }
 .admin-filter-row button.selected, .admin-filter-row button:hover { border-color: #f7d889; color: #f7d889; }
+.admin-day-filter { flex-wrap: wrap; align-items: center; margin-top: 14px; }
+.admin-day-filter select { border: 1px solid rgba(255,255,255,.14); padding: 7px 10px; color: #c9ccd2; background: #0e0f14; font-size: 10px; }
 
 .admin-review-card { margin-bottom: 14px; }
 .admin-table-card tbody tr.is-clickable { cursor: pointer; }

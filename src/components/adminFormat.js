@@ -9,7 +9,7 @@ export function toDate(value) {
 
 export function formatDate(value) {
   const date = toDate(value)
-  return date ? date.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '-'
+  return date ? date.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata' }) : '-'
 }
 
 export function timeAgo(value) {
