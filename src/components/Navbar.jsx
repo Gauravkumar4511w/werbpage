@@ -1,8 +1,12 @@
+import { useInstallPrompt } from '../installPrompt.js'
+
 function Navbar({ menuOpen, setMenuOpen, player, setAuthOpen, onHome, onHistory, libraryOpen, tournamentsOpen, myMatchesOpen, onMyMatches, upcomingMatchCount, onTournaments, onCoinClick, coinBalance, onAdmin, playerLevel = 1 }) {
   const closeMenu = () => setMenuOpen(false)
   const openWallet = () => { closeMenu(); onCoinClick() }
   const openAccount = () => { closeMenu(); setAuthOpen(true) }
   const initials = player ? player.name.slice(0, 2).toUpperCase() : 'AC'
+  const { canInstall, install } = useInstallPrompt()
+  const installApp = () => { closeMenu(); install() }
 
   return (
     <nav className="navbar" aria-label="Main navigation">
@@ -40,6 +44,7 @@ function Navbar({ menuOpen, setMenuOpen, player, setAuthOpen, onHome, onHistory,
           <a className={`nav-link${myMatchesOpen ? ' active' : ''}`} href="#my-matches" onClick={onMyMatches}>My Matches{upcomingMatchCount > 0 && <span className="my-matches-count" aria-label={`${upcomingMatchCount} upcoming`}>{upcomingMatchCount}</span>}</a>
         </div>
         <div className="nav-actions">
+          {canInstall && <button className="admin-link install-app" type="button" onClick={installApp}>Install app</button>}
           <button className="admin-link" type="button" onClick={onAdmin}>Admin</button>
           <button className="icon-button search-button" type="button" aria-label="Open match history" onClick={onHistory}>
             <span aria-hidden="true"></span>

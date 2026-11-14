@@ -1,6 +1,7 @@
 import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import babel from '@rolldown/plugin-babel'
 import { defineConfig } from 'vite'
+import { VitePWA } from 'vite-plugin-pwa'
 
 function apiDevPlugin() {
   const mountApi = (server) => {
@@ -42,5 +43,38 @@ export default defineConfig({
     apiDevPlugin(),
     react(),
     babel({ presets: [reactCompilerPreset()] }),
+    // Makes the site installable from Chrome ("Install ArenaCore" in the address bar / menu).
+    VitePWA({
+      registerType: 'autoUpdate',
+      injectRegister: 'auto',
+      includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
+      manifest: {
+        id: '/',
+        name: 'ArenaCore',
+        short_name: 'ArenaCore',
+        description: 'Free Fire matches, tournaments and coin wallet.',
+        start_url: '/',
+        scope: '/',
+        display: 'standalone',
+        orientation: 'any',
+        background_color: '#070b10',
+        theme_color: '#070b10',
+        icons: [
+          { src: '/pwa-192x192.png', sizes: '192x192', type: 'image/png' },
+          { src: '/pwa-512x512.png', sizes: '512x512', type: 'image/png' },
+          { src: '/maskable-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        ],
+      },
+      workbox: {
+        // Only the app shell is cached. Wallet, matches and login always go to the network.
+        globPatterns: ['**/*.{js,css,html,svg,png,jpg,webp,woff2}'],
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        navigateFallback: '/index.html',
+        navigateFallbackDenylist: [/^\/api\//, /^\/privacy\.html$/, /^\/terms\.html$/],
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        skipWaiting: true,
+      },
+    }),
   ],
 })
