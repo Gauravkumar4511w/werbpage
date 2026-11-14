@@ -1,5 +1,5 @@
-function HeroSection({ openTournaments, openMyMatches, liveCount = 1 }) {
-  const displayCount = Math.max(1, Number(liveCount) || 1)
+function HeroSection({ openTournaments, openMyMatches, totalAccounts = 0 }) {
+  const displayCount = Math.max(0, Number(totalAccounts) || 0)
   return (
     <section className="nav-showcase" id="top">
       <p className="eyebrow"><span></span> Your next obsession awaits</p>
@@ -9,7 +9,7 @@ function HeroSection({ openTournaments, openMyMatches, liveCount = 1 }) {
         <a className="primary-cta" href="#tournaments" onClick={openTournaments}>Explore games <span aria-hidden="true">-&gt;</span></a>
         <a className="secondary-cta" href="#my-matches" onClick={openMyMatches}>My matches</a>
       </div>
-      <div className="status-bar"><span className="status-pulse"></span> {displayCount.toLocaleString()} players online <span className="status-divider"></span> Season 08 is live</div>
+      <div className="status-bar"><span className="status-pulse"></span> {displayCount.toLocaleString()} {displayCount === 1 ? 'player' : 'players'} registered <span className="status-divider"></span> Season 08 is live</div>
     </section>
   )
 }
