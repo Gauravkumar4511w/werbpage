@@ -210,7 +210,8 @@ function App() {
       return [];
     }
   });
-  const [liveCount, setLiveCount] = useState(() => Math.max(1, registeredUsers.length));
+  // The hero shows how many accounts exist; the server's count replaces this local guess.
+  const [totalAccounts, setTotalAccounts] = useState(() => registeredUsers.length);
 
   useEffect(() => {
     let active = true;
@@ -243,8 +244,8 @@ function App() {
         });
         if (!res.ok) return;
         const data = await res.json();
-        if (active && data.liveCount) {
-          setLiveCount(data.liveCount);
+        if (active && typeof data.totalUsers === "number") {
+          setTotalAccounts(data.totalUsers);
         }
       } catch {
         // Fallback
@@ -479,7 +480,7 @@ function App() {
     setOtpChallenge(null);
     setForm(emptyAuthForm);
     fetch("/api/presence/stats").then((response) => response.json()).then((stats) => {
-      if (stats?.liveCount) setLiveCount(stats.liveCount);
+      if (typeof stats?.totalUsers === "number") setTotalAccounts(stats.totalUsers);
     }).catch(() => {});
   };
 
@@ -974,7 +975,7 @@ function App() {
           }}
         />
       ) : (
-        <HeroSection openTournaments={openTournaments} openMyMatches={openMyMatches} liveCount={liveCount} />
+        <HeroSection openTournaments={openTournaments} openMyMatches={openMyMatches} totalAccounts={totalAccounts} />
       )}
       <AuthModal
         authOpen={authOpen}
