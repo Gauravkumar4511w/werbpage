@@ -10,6 +10,7 @@ const matchModes = MATCH_MODES
 const defaultFees = DEFAULT_ENTRY_FEES
 const adminTitle = 'ADMIN DESK · ARENACORE'
 const CURRENT_MATCH_WINDOW_MS = 2 * 60 * 60 * 1000
+const AWAITING_RESULT_WINDOW_MS = 2 * 24 * 60 * 60 * 1000
 
 // Match times are entered and shown in India time, whatever time zone the admin's device uses;
 // reading the box as device time saved a match hours off (and on the wrong day) outside India.
@@ -75,8 +76,11 @@ function AdminPanel({ onBack }) {
   const [userLookup, setUserLookup] = useState('')
   const [userDetail, setUserDetail] = useState(null)
   const [userForm, setUserForm] = useState({ userKey: '', displayName: '', password: '', creditCoins: '' })
-  const [killForm, setKillForm] = useState({ matchId: '', userKey: '', kills: '' })
-  const [resultForm, setResultForm] = useState({ matchId: '', winnerTeamNo: '' })
+  // matchKey is the exact match picked from "Matches waiting for a result"; typing a number clears it.
+  const emptyKillForm = { matchId: '', matchKey: '', userKey: '', kills: '' }
+  const emptyResultForm = { matchId: '', matchKey: '', winnerTeamNo: '' }
+  const [killForm, setKillForm] = useState(emptyKillForm)
+  const [resultForm, setResultForm] = useState(emptyResultForm)
   const [matchLookup, setMatchLookup] = useState('')
   // Which matches the table lists: 'today' (today's and upcoming), 'all', or one India date (YYYY-MM-DD).
   const [matchDay, setMatchDay] = useState('today')
@@ -345,9 +349,10 @@ function AdminPanel({ onBack }) {
   const submitKills = async (event) => {
     event.preventDefault()
     try {
-      await api('/api/admin/matches/kills', { method: 'POST', body: JSON.stringify({ matchId: killForm.matchId, kills: [{ userKey: killForm.userKey, kills: Number(killForm.kills) }] }) })
-      setKillForm({ matchId: '', userKey: '', kills: '' })
-      setMessage('Kill count saved.')
+      await api('/api/admin/matches/kills', { method: 'POST', body: JSON.stringify({ matchId: killForm.matchKey || killForm.matchId, kills: [{ userKey: killForm.userKey, kills: Number(killForm.kills) }] }) })
+      // The match stays filled in, so the next team's kills are one pick away.
+      setKillForm({ ...killForm, userKey: '', kills: '' })
+      setMessage(`Kill count saved for ${killForm.userKey}.`)
       await loadOverview()
     } catch (error) { setMessage(error.message) }
   }
@@ -357,6 +362,20 @@ function AdminPanel({ onBack }) {
     const text = String(value || '').trim()
     return pickByMatchNo(overview.matches, text)
       || overview.matches.find((item) => item.match_id.toLowerCase() === text.toLowerCase() || item.public_id === text.replace(/^#/, '').padStart(6, '0'))
+  }
+
+  // The match a card's form points at: the exact one picked from the list, else the typed number.
+  const formMatch = (form) => (form.matchKey ? overview.matches.find((item) => item.match_id === form.matchKey) : String(form.matchId || '').trim() ? findMatchById(form.matchId) : null) || null
+  const teamsOf = (match) => (match ? groupTeams(overview.entries.filter((entry) => entry.match_id === match.match_id), overview.kills.filter((item) => item.match_id === match.match_id)) : [])
+
+  // From "Matches waiting for a result": fills a card with that exact match and scrolls to it.
+  const startResult = (match) => {
+    setResultForm({ matchId: formatMatchLabel(match), matchKey: match.match_id, winnerTeamNo: '' })
+    window.setTimeout(() => document.getElementById('admin-confirm-winner')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50)
+  }
+  const startKills = (match) => {
+    setKillForm({ ...emptyKillForm, matchId: formatMatchLabel(match), matchKey: match.match_id })
+    window.setTimeout(() => document.getElementById('admin-record-kills')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50)
   }
 
   // The admin types only the winning team's number; the server pays that team's players straight
@@ -390,7 +409,7 @@ function AdminPanel({ onBack }) {
 
   const submitResult = async (event) => {
     event.preventDefault()
-    if (await declareWinner(resultForm.matchId, resultForm.winnerTeamNo)) setResultForm({ matchId: '', winnerTeamNo: '' })
+    if (await declareWinner(resultForm.matchKey || resultForm.matchId, resultForm.winnerTeamNo)) setResultForm(emptyResultForm)
   }
 
   const matchFormValues = (match) => ({
@@ -562,6 +581,14 @@ function AdminPanel({ onBack }) {
     })
     // Searched after "#05", "8:00 pm" and the day are added, so those can be typed into the search.
     .filter(searchable)
+  // Started in the last two days, someone joined, and no winner yet: these still need a result.
+  const awaitingResult = overview.matches
+    .filter((match) => match.status !== 'confirmed' && Number(match.match_timestamp) <= now && Number(match.match_timestamp) >= now - AWAITING_RESULT_WINDOW_MS && joinedTeams(match.match_id) > 0)
+    .sort((a, b) => Number(a.match_timestamp) - Number(b.match_timestamp))
+  const resultMatch = formMatch(resultForm)
+  const resultTeams = teamsOf(resultMatch)
+  const killMatch = formMatch(killForm)
+  const killTeams = teamsOf(killMatch)
   const currentSelectedMatch = selectedMatch
     ? overview.matches.find((match) => match.match_id === selectedMatch.match_id) || selectedMatch
     : null
@@ -658,11 +685,64 @@ function AdminPanel({ onBack }) {
 
       {tab === 'overview' && <>
         <PaymentReviewTable title="Top-ups waiting for verification" rows={pendingPayments} busy={busy} highlight={highlight} onReview={reviewPayment} onOpenUser={openUser} onViewUpload={viewUpload} emptyText="No top-ups are waiting. New UTR submissions appear here and in Alerts." />
+        <section className="admin-table-card admin-awaiting">
+          <div className="admin-card-heading"><h2>Matches waiting for a result</h2><span>{awaitingResult.length} {awaitingResult.length === 1 ? 'match' : 'matches'}</span></div>
+          {awaitingResult.length ? (
+            <div className="admin-table-wrap">
+              <table>
+                <thead><tr><th>Match</th><th>Next step</th><th>Started</th><th>Teams</th><th>Kills saved</th><th>Mode</th></tr></thead>
+                <tbody>
+                  {awaitingResult.map((match) => (
+                    <tr key={match.match_id}>
+                      <td><strong>{formatMatchLabel(match)}</strong></td>
+                      <td>
+                        <div className="admin-row-actions">
+                          <button type="button" onClick={() => startKills(match)}>Record kills</button>
+                          <button type="button" className="is-primary" onClick={() => startResult(match)}>Confirm winner</button>
+                        </div>
+                      </td>
+                      <td>{formatTime(match.match_timestamp)}</td>
+                      <td>{joinedTeams(match.match_id)}</td>
+                      <td>{new Set(overview.kills.filter((item) => item.match_id === match.match_id).map((item) => item.user_key)).size}</td>
+                      <td>{match.mode}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : <p className="admin-empty-note">No started match is waiting for a result. Matches appear here once they start and someone has joined.</p>}
+        </section>
         <div className="admin-grid">
           {userLookupCard}
           <section className="admin-card"><h2>Add active user</h2><p>Register a new active player with a login password. Share the password with the player.</p><form onSubmit={submitCreateUser}><input placeholder="User email / phone" value={userForm.userKey} onChange={(event) => setUserForm({ ...userForm, userKey: event.target.value })} required /><input placeholder="Display name / Gamer tag" value={userForm.displayName} onChange={(event) => setUserForm({ ...userForm, displayName: event.target.value })} required /><input type="text" minLength={6} autoComplete="off" placeholder="Login password for the player (6+ characters)" value={userForm.password} onChange={(event) => setUserForm({ ...userForm, password: event.target.value })} required /><input type="number" min="0" placeholder="Opening credit coins (optional)" value={userForm.creditCoins} onChange={(event) => setUserForm({ ...userForm, creditCoins: event.target.value })} /><button type="submit">Add active user</button></form></section>
-          <section className="admin-card"><h2>Record kills</h2><p>Save the final kill count before confirming a result.</p><form onSubmit={submitKills}><input placeholder="Match no., e.g. #05" value={killForm.matchId} onChange={(event) => setKillForm({ ...killForm, matchId: event.target.value })} required /><input placeholder="User email / phone" value={killForm.userKey} onChange={(event) => setKillForm({ ...killForm, userKey: event.target.value })} required /><input type="number" min="0" placeholder="Kills" value={killForm.kills} onChange={(event) => setKillForm({ ...killForm, kills: event.target.value })} required /><button type="submit">Save kills</button></form></section>
-          <section className="admin-card"><h2>Confirm winner</h2><p>Enter the match number (#05 = today&apos;s match 5) and the winning team&apos;s number (#1, #2... in the order they joined, shown in Match control). Their winnings go straight to their wallet, and a result can only be paid once.</p><form onSubmit={submitResult}><input placeholder="Match no., e.g. #05" value={resultForm.matchId} onChange={(event) => setResultForm({ ...resultForm, matchId: event.target.value })} required /><input type="number" min="1" step="1" inputMode="numeric" placeholder="Winning team no., e.g. 2" value={resultForm.winnerTeamNo} onChange={(event) => setResultForm({ ...resultForm, winnerTeamNo: event.target.value })} required /><button type="submit">Confirm winner and pay</button></form></section>
+          <section className="admin-card" id="admin-record-kills">
+            <h2>Record kills</h2>
+            <p>Enter the match number, then pick the team from the list. The match stays filled in for the next team.</p>
+            <form onSubmit={submitKills}>
+              <input placeholder="Match no., e.g. #05" value={killForm.matchId} onChange={(event) => setKillForm({ ...killForm, matchId: event.target.value, matchKey: '', userKey: '' })} required />
+              {killTeams.length ? (
+                <select value={killForm.userKey} onChange={(event) => setKillForm({ ...killForm, userKey: event.target.value })} required>
+                  <option value="">Pick the team…</option>
+                  {killTeams.flatMap((team) => team.members.map((member) => <option key={member.user_key} value={member.user_key}>#{team.teamNo} · {memberNames(member)} · {member.user_key}</option>))}
+                </select>
+              ) : (
+                <input placeholder="User email / phone" value={killForm.userKey} onChange={(event) => setKillForm({ ...killForm, userKey: event.target.value })} required />
+              )}
+              <input type="number" min="0" placeholder="Kills" value={killForm.kills} onChange={(event) => setKillForm({ ...killForm, kills: event.target.value })} required />
+              <button type="submit">Save kills</button>
+            </form>
+            <MatchTeamsPreview typed={killForm.matchId} match={killMatch} teams={killTeams} selectedKey={killForm.userKey} onPick={(team) => setKillForm({ ...killForm, userKey: team.members[0].user_key })} />
+          </section>
+          <section className="admin-card" id="admin-confirm-winner">
+            <h2>Confirm winner</h2>
+            <p>Enter the match number (#05 = today&apos;s match 5). Its joined teams appear below: tap the winning team, check the names, and confirm. Winnings go straight to their wallet, and a result can only be paid once.</p>
+            <form onSubmit={submitResult}>
+              <input placeholder="Match no., e.g. #05" value={resultForm.matchId} onChange={(event) => setResultForm({ ...resultForm, matchId: event.target.value, matchKey: '', winnerTeamNo: '' })} required />
+              <input type="number" min="1" step="1" inputMode="numeric" placeholder="Winning team no., e.g. 2" value={resultForm.winnerTeamNo} onChange={(event) => setResultForm({ ...resultForm, winnerTeamNo: event.target.value })} required />
+              <button type="submit" disabled={resultMatch?.status === 'confirmed'}>{resultMatch?.status === 'confirmed' ? 'Already confirmed' : resultForm.winnerTeamNo ? `Confirm team #${resultForm.winnerTeamNo} and pay` : 'Confirm winner and pay'}</button>
+            </form>
+            <MatchTeamsPreview typed={resultForm.matchId} match={resultMatch} teams={resultTeams} selectedNo={Number(resultForm.winnerTeamNo) || null} onPick={resultMatch?.status === 'confirmed' ? null : (team) => setResultForm({ ...resultForm, winnerTeamNo: String(team.teamNo) })} />
+          </section>
         </div>
       </>}
 
@@ -789,14 +869,57 @@ function CopyButton({ value }) {
 // Joined teams by number (#1, #2... in join order). The admin declares the winner by that number.
 const saveButtonLabels = { idle: 'Save match changes', saving: 'Saving…', saved: 'Saved ✓', error: 'Not saved · try again' }
 
-function MatchControl({ match, entries, kills, form, setForm, saveState = 'idle', onSubmit, onDelete, onOpenUser, onDeclareWinner }) {
-  const [winnerNo, setWinnerNo] = useState('')
-  const teams = [...entries.reduce((byNo, entry) => {
+// A team's in-game names, or its account when no names were given.
+function memberNames(entry) {
+  return entry.identifiers?.length ? entry.identifiers.join(', ') : entry.user_key
+}
+
+// Joined teams by number (#1, #2... in join order), each with its players and total kills.
+function groupTeams(entries, kills = []) {
+  return [...entries.reduce((byNo, entry) => {
     const teamNo = Number(entry.team_no) || 0
-    if (!byNo.has(teamNo)) byNo.set(teamNo, { teamNo, teamKey: entry.team_key, members: [] })
-    byNo.get(teamNo).members.push(entry)
+    if (!byNo.has(teamNo)) byNo.set(teamNo, { teamNo, teamKey: entry.team_key, members: [], kills: 0 })
+    const team = byNo.get(teamNo)
+    team.members.push(entry)
+    team.kills += Number(kills.find((item) => item.user_key === entry.user_key)?.kills || 0)
     return byNo
   }, new Map()).values()].sort((a, b) => a.teamNo - b.teamNo)
+}
+
+// Shown under "Confirm winner" and "Record kills" once a match number is typed: which match it
+// found and every joined team with its number, names and kills. Tapping a team fills the form.
+function MatchTeamsPreview({ typed, match, teams, selectedNo = null, selectedKey = '', onPick }) {
+  if (!String(typed || '').trim()) return null
+  if (!match) return <p className="admin-team-preview admin-team-preview-empty">No match found for “{typed}”. Use its number, such as #05.</p>
+  const winner = match.status === 'confirmed' ? teams.find((team) => team.teamKey === match.winner_team_key) : null
+  return (
+    <div className="admin-team-preview">
+      <p className="admin-team-preview-head">
+        <strong>{formatMatchLabel(match)}</strong> · {match.mode} · {formatTime(match.match_timestamp)} · {teams.length} {teams.length === 1 ? 'team' : 'teams'} joined
+        {winner && <em> · team #{winner.teamNo} already won</em>}
+      </p>
+      {teams.length ? (
+        <div className="admin-player-list">
+          {teams.map((team) => {
+            const selected = selectedNo === team.teamNo || team.members.some((member) => member.user_key === selectedKey)
+            return (
+              <button key={team.teamNo} type="button" className={`${selected ? 'is-selected' : ''} ${winner?.teamNo === team.teamNo ? 'is-winner' : ''}`} onClick={() => onPick?.(team)} disabled={!onPick} aria-pressed={selected}>
+                <b className="admin-team-no">#{team.teamNo || '?'}</b>
+                <strong>{team.teamKey}</strong>
+                <span>{team.members.map(memberNames).join(', ')}</span>
+                <small>{team.kills} kills{winner?.teamNo === team.teamNo ? ' · WINNER' : ''}</small>
+              </button>
+            )
+          })}
+        </div>
+      ) : <p className="admin-team-preview-empty">Nobody joined this match yet.</p>}
+    </div>
+  )
+}
+
+function MatchControl({ match, entries, kills, form, setForm, saveState = 'idle', onSubmit, onDelete, onOpenUser, onDeclareWinner }) {
+  const [winnerNo, setWinnerNo] = useState('')
+  const teams = groupTeams(entries, kills)
   const winner = match.status === 'confirmed' ? teams.find((team) => team.teamKey === match.winner_team_key) : null
   const declare = async (event) => {
     event.preventDefault()
