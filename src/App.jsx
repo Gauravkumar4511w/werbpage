@@ -1077,7 +1077,7 @@ function App() {
                 {detailsPerKill > 0 && (
                   <div className="match-detail-win">
                     <span>Per kill</span>
-                    <strong>{detailsPerKill} coins</strong>
+                    <strong>{detailsPerKill} {detailsPerKill === 1 ? "coin" : "coins"}</strong>
                   </div>
                 )}
                 <div>

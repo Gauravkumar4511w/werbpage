@@ -55,7 +55,7 @@ before(async () => {
   admin = { authorization: `Bearer ${result.data.token}` }
 })
 
-test('Battle Royale Solo pays 4, 7 or 10 and Duo 2, 4 or 6 coins a kill for a 10, 15 or 25 coin entry', () => {
+test('Battle Royale Solo pays 4, 7 or 10 and Duo 2, 4 or 6 coins a kill for a 10, 15 or 25 coin entry, and Squad 1 to 3', () => {
   assert.equal(getDefaultPerKill('Battle Royale Solo', 10), 4)
   assert.equal(getDefaultPerKill('Battle Royale Solo', 15), 7)
   assert.equal(getDefaultPerKill('Battle Royale Solo', 25), 10)
@@ -63,7 +63,8 @@ test('Battle Royale Solo pays 4, 7 or 10 and Duo 2, 4 or 6 coins a kill for a 10
   assert.equal(getDefaultPerKill('Battle Royale Duo', 25), 6)
   assert.equal(getDefaultPerKill('Battle Royale Duo', 15), 4)
   assert.equal(getDefaultPerKill('Battle Royale Duo', 10), 2)
-  assert.equal(getDefaultPerKill('Battle Royale Squad', 15), 0)
+  for (const [fee, coins] of [[10, 1], [15, 1], [25, 2], [30, 2], [35, 3]]) assert.equal(getDefaultPerKill('Battle Royale Squad', fee), coins)
+  assert.equal(getDefaultPerKill('Clash Squad 4v4', 15), 0)
   assert.equal(getWinningCoins({ mode: 'Battle Royale Solo', entryFee: 10 }), 0)
   assert.equal(getWinningCoins({ mode: 'Battle Royale Solo', entryFee: 10, prizePool: 50 }), 50)
   assert.equal(getWinningCoins({ mode: 'Clash Squad 1v1', entryFee: 10 }), 16)
