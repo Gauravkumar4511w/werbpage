@@ -10,7 +10,7 @@ import { countUpcomingMatches } from "./myMatches.js";
 import Navbar from "./components/Navbar";
 import TournamentSection from "./components/TournamentSection";
 import WalletModal from "./components/WalletModal";
-import { EDIT_LOCK_MS, formatMatchNo, getTeamSize } from "../lib/match-schedule.js";
+import { EDIT_LOCK_MS, formatMatchNo, getTeamSize, getWinningCoins } from "../lib/match-schedule.js";
 import { imageFileToDataUrl } from "./imageUpload.js";
 
 const userDataStorageKey = "nexus-user-data";
@@ -889,6 +889,7 @@ function App() {
 
   const detailsEntry = matchDetails ? visibleJoinedMatches.find((entry) => entry.id === matchDetails.id) : null;
   const detailsStarted = Boolean(matchDetails?.matchTimestamp) && currentTime >= matchDetails.matchTimestamp;
+  const detailsWinning = matchDetails ? getWinningCoins(matchDetails) : null;
 
   return (
     <main className="gaming-page">
@@ -1066,6 +1067,10 @@ function App() {
                   <span>Entry</span>
                   <strong>{Number(matchDetails.entryFee || 0).toLocaleString()} coins</strong>
                 </div>
+                <div className="match-detail-win">
+                  <span>Winning coins</span>
+                  <strong>{detailsWinning.toLocaleString()} coins</strong>
+                </div>
                 <div>
                   <span>Start</span>
                   <strong>
@@ -1085,9 +1090,6 @@ function App() {
                 <p className="match-description">
                   {matchDetails.description || "This match is built for quick coordination, fair bracket timing, and instant room access for all confirmed players."}
                 </p>
-                {matchDetails.prizePool !== null && matchDetails.prizePool !== undefined && (
-                  <div className="match-prize-box"><span>Prize pool</span><strong>{Number(matchDetails.prizePool).toLocaleString()} coins</strong></div>
-                )}
 
                 {detailsEntry && (
                   <div className="match-player-list">
