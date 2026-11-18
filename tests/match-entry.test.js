@@ -65,7 +65,7 @@ test('joining works on every day, even after earlier days used the same browser 
   for (const now of [monday, monday + 24 * hour]) {
     const match = scheduled(now, 'Battle Royale Solo')
     const result = await db.recordMatchEntry({ ...players[0], matchId: match.id, identifiers: ['ShadowKite'] }, now)
-    assert.equal(result.charged, 50)
+    assert.equal(result.charged, 10)
     assert.ok(result.wallet.entries.some((entry) => entry.matchId === match.id.toLowerCase()))
   }
   const publicIds = (await db.getPublicMatchCatalog(monday)).map((match) => match.public_id)
@@ -102,7 +102,7 @@ test('each mode asks for one name per team member and names can be edited until 
   const duo = scheduled(monday, 'Battle Royale Duo')
   await assert.rejects(() => db.recordMatchEntry({ ...players[1], matchId: duo.id, identifiers: ['OnlyOne'] }, monday), /all 2/)
   const joined = await db.recordMatchEntry({ ...players[1], matchId: duo.id, identifiers: ['Alpha01', 'Bravo02'] }, monday)
-  assert.equal(joined.charged, 100)
+  assert.equal(joined.charged, 15)
 
   const edited = await db.recordMatchEntry({ ...players[1], matchId: duo.id, identifiers: ['Alpha01', 'Charlie3'] }, monday)
   assert.equal(edited.charged, 0)
