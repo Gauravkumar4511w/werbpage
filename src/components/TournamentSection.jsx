@@ -217,7 +217,7 @@ function TournamentSection({ tournamentsOpen, onBack, joinedMatches, onJoinMatch
                     <div className="match-meta">
                       <time>{formatTime(match.matchTimestamp)}</time>
                       <span className="match-entry-fee"><span className="coin-icon" aria-hidden="true"></span>{entryFee} coins</span>
-                      <span className="match-win-coins">{winning.toLocaleString()} winning coins</span>
+                      {winning > 0 && <span className="match-win-coins">{winning.toLocaleString()} winning coins</span>}
                       {perKill > 0 && <span className="match-win-coins">{perKill} coins per kill</span>}
                       <span className={`match-capacity-badge${matchCapacity.unit === 'players' ? ' is-player-count' : ''}`} style={{ '--capacity-fill': `${fillPercent}%` }}>
                         <span>{joinedCount}/{matchCapacity.total} {matchCapacity.unit}</span>
