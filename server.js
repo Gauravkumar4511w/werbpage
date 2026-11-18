@@ -426,8 +426,7 @@ async function handleApiRequest(request, response) {
   if (request.method === 'POST' && pathname === '/api/admin/matches/kills') {
     if (!await requireAdmin(request, response)) return
     try {
-      await recordMatchKills(await readBody(request))
-      sendJson(response, 200, { recorded: true })
+      sendJson(response, 200, { recorded: true, ...await recordMatchKills(await readBody(request)) })
     } catch (error) {
       sendJson(response, 400, { message: error instanceof Error ? error.message : 'Could not save kills.' })
     }

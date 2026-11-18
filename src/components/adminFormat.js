@@ -39,6 +39,7 @@ export const ledgerReasons = {
   match_entry: 'Match entry',
   match_refund: 'Match refund',
   match_win: 'Match winnings',
+  kill_reward: 'Kill coins',
   withdrawal_hold: 'Withdrawal requested',
   withdrawal_refund: 'Withdrawal refunded',
 }
