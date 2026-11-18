@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { DEFAULT_ENTRY_FEES, EDIT_LOCK_MS, MATCH_MODES, formatMatchNo, getMatchCapacity, getScheduledMatches } from '../../lib/match-schedule.js'
+import { DEFAULT_ENTRY_FEES, EDIT_LOCK_MS, MATCH_MODES, formatMatchNo, getMatchCapacity, getScheduledMatches, getWinningCoins } from '../../lib/match-schedule.js'
 import freeFireMaxIcon from '../assets/hero-banner.jpg'
 import battleRoyalImage from '../assets/battelroyal.jpg'
 import clashSquadImage from '../assets/clashsquad.jpg'
@@ -185,6 +185,7 @@ function TournamentSection({ tournamentsOpen, onBack, joinedMatches, onJoinMatch
                   {day.matches.filter((match) => group.modes.includes(match.mode)).map((match) => {
                 const entryFee = match.entryFee || DEFAULT_ENTRY_FEES[match.mode]
                 const matchCapacity = getMatchCapacity(match.mode)
+                const winning = getWinningCoins({ mode: match.mode, entryFee, prizePool: match.prizePool })
                 const joinedEntry = joinedMatches.find((entry) => entry.id === match.id)
                 const isJoined = Boolean(joinedEntry)
                 const joinedCount = match.joinedCount ?? (isJoined ? 1 : 0)
@@ -214,6 +215,7 @@ function TournamentSection({ tournamentsOpen, onBack, joinedMatches, onJoinMatch
                     <div className="match-meta">
                       <time>{formatTime(match.matchTimestamp)}</time>
                       <span className="match-entry-fee"><span className="coin-icon" aria-hidden="true"></span>{entryFee} coins</span>
+                      <span className="match-win-coins">Win {winning.upTo ? 'up to ' : ''}{winning.coins.toLocaleString()} coins</span>
                       <span className={`match-capacity-badge${matchCapacity.unit === 'players' ? ' is-player-count' : ''}`} style={{ '--capacity-fill': `${fillPercent}%` }}>
                         <span>{joinedCount}/{matchCapacity.total} {matchCapacity.unit}</span>
                       </span>

@@ -54,7 +54,7 @@
 .match-detail-banner-overlay { position: absolute; z-index: 2; right: 16px; bottom: 16px; display: grid; gap: 3px; text-align: right; }
 .match-detail-banner-overlay span { color: #9ad9d3; font-size: 8px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; }
 .match-detail-banner-overlay strong { color: #f5f1eb; font-family: var(--heading); font-size: 18px; line-height: 1; }
-.match-detail-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 18px 0; }
+.match-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 18px 0; }
 .match-detail-grid div { display: grid; gap: 5px; padding: 12px 10px; border: 1px solid rgba(110, 240, 230, 0.16); background: linear-gradient(180deg, rgba(255,255,255,.025), rgba(255,255,255,.015)); min-height: 78px; }
 .match-detail-grid span, .room-info-box span { color: #7f7b80; font-size: 8px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
 .match-detail-grid strong, .room-info-box strong { color: #f5f1eb; font-family: var(--mono); font-size: 11px; }
@@ -191,6 +191,8 @@
 .scheduled-match time { min-width: 70px; color: #ffc16d; font-family: var(--mono); font-size: 11px; font-weight: 700; text-align: right; }
 .match-meta { display: grid; justify-items: end; gap: 5px; }
 .match-entry-fee { color: #d8a952; font-size: 9px; font-weight: 700; letter-spacing: .04em; white-space: nowrap; }
+.match-win-coins { color: #6ee7a0; font-family: var(--mono); font-size: 8px; font-weight: 700; letter-spacing: .04em; white-space: nowrap; }
+.match-detail-grid .match-detail-win strong { color: #6ee7a0; }
 .coin-icon { position: relative; display: inline-block; width: 10px; height: 10px; margin: 0 7px 0 2px; border: 1px solid #f3c968; background: linear-gradient(135deg, #ffe08a, #c88a2e); transform: rotate(45deg); vertical-align: -1px; box-shadow: 0 0 7px rgba(243,201,104,.3); }
 .coin-icon::after { position: absolute; top: 2px; left: 2px; width: 4px; height: 4px; border: 1px solid rgba(255,248,194,.75); content: ''; }
 .scheduled-match button { width: 60px; padding: 10px 0; border: 1px solid #ff765b; color: #ffad99; background: transparent; font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; cursor: pointer; transition: color .2s ease, background .2s ease; }
