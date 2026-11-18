@@ -1068,8 +1068,8 @@ function App() {
                   <strong>{Number(matchDetails.entryFee || 0).toLocaleString()} coins</strong>
                 </div>
                 <div className="match-detail-win">
-                  <span>Win{detailsWinning.upTo ? " up to" : ""}</span>
-                  <strong>{detailsWinning.coins.toLocaleString()} coins</strong>
+                  <span>Winning coins</span>
+                  <strong>{detailsWinning.toLocaleString()} coins</strong>
                 </div>
                 <div>
                   <span>Start</span>
