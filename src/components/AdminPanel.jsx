@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import AdminUserDetail, { ReviewButtons } from './AdminUserDetail'
 import { formatDate, formatDay, formatTime, timeAgo, withdrawalDestination } from './adminFormat'
 import ScreenshotButton from './ScreenshotButton'
-import { DEFAULT_ENTRY_FEES, MATCH_MODES, formatMatchLabel, formatMatchNo, getIndiaDate, getMatchCapacity, pickByMatchNo } from '../../lib/match-schedule.js'
+import { DEFAULT_ENTRY_FEES, MATCH_MODES, getDefaultPerKill, formatMatchLabel, formatMatchNo, getIndiaDate, getMatchCapacity, pickByMatchNo } from '../../lib/match-schedule.js'
 
 const emptyOverview = { users: [], matches: [], entries: [], payments: [], withdrawals: [], kills: [], notifications: [], unreadNotifications: 0 }
 // The same modes and fees the daily schedule uses, so changing a fee in one place changes both.
@@ -93,10 +93,10 @@ function AdminPanel({ onBack }) {
   // When the overview was last loaded; the 5 s refresh keeps it current, so "today" rolls over at midnight.
   const [loadedAt, setLoadedAt] = useState(() => Date.now())
   const [selectedMatch, setSelectedMatch] = useState(null)
-  const [matchForm, setMatchForm] = useState({ entryFee: '', matchTimestamp: '', prizePool: '', description: '', roomId: '', roomPassword: '' })
+  const [matchForm, setMatchForm] = useState({ entryFee: '', matchTimestamp: '', prizePool: '', perKill: '', description: '', roomId: '', roomPassword: '' })
   // The match form's save button: 'idle', 'saving', 'saved' (green until the next edit) or 'error'.
   const [matchSaveState, setMatchSaveState] = useState('idle')
-  const [createForm, setCreateForm] = useState({ mode: matchModes[0], entryFee: String(defaultFees[matchModes[0]]), matchTimestamp: '', prizePool: '', description: '' })
+  const [createForm, setCreateForm] = useState({ mode: matchModes[0], entryFee: String(defaultFees[matchModes[0]]), matchTimestamp: '', prizePool: '', perKill: '', description: '' })
   const lastNotificationId = useRef(null)
 
   const api = async (url, options = {}) => {
@@ -355,10 +355,11 @@ function AdminPanel({ onBack }) {
   const submitKills = async (event) => {
     event.preventDefault()
     try {
-      await api('/api/admin/matches/kills', { method: 'POST', body: JSON.stringify({ matchId: killForm.matchKey || killForm.matchId, kills: [{ userKey: killForm.userKey, kills: Number(killForm.kills) }] }) })
+      const data = await api('/api/admin/matches/kills', { method: 'POST', body: JSON.stringify({ matchId: killForm.matchKey || killForm.matchId, kills: [{ userKey: killForm.userKey, kills: Number(killForm.kills) }] }) })
+      const paid = data.results?.[0]
       // The match stays filled in, so the next team's kills are one pick away.
       setKillForm({ ...killForm, userKey: '', kills: '' })
-      setMessage(`Kill count saved for ${killForm.userKey}.`)
+      setMessage(`Kill count saved for ${killForm.userKey}.${paid?.change > 0 ? ` ${paid.change} kill coins paid (${data.perKill} per kill).` : paid?.change < 0 ? ` ${-paid.change} kill coins taken back.` : ''}`)
       await loadOverview()
     } catch (error) { setMessage(error.message) }
   }
@@ -433,6 +434,7 @@ function AdminPanel({ onBack }) {
     entryFee: String(match.entry_fee),
     matchTimestamp: toLocalInputValue(match.match_timestamp),
     prizePool: match.prize_pool === null || match.prize_pool === undefined ? '' : String(match.prize_pool),
+    perKill: match.per_kill === null || match.per_kill === undefined ? '' : String(match.per_kill),
     description: match.description || '',
     roomId: match.room_id || '',
     roomPassword: match.room_password || '',
@@ -471,6 +473,7 @@ function AdminPanel({ onBack }) {
           entryFee: Number(matchForm.entryFee),
           matchTimestamp: fromIstInputValue(matchForm.matchTimestamp),
           prizePool: matchForm.prizePool === '' ? '' : Number(matchForm.prizePool),
+          perKill: matchForm.perKill === '' ? null : Number(matchForm.perKill),
           description: matchForm.description,
           roomId: matchForm.roomId,
           roomPassword: matchForm.roomPassword,
@@ -500,10 +503,11 @@ function AdminPanel({ onBack }) {
           entryFee: Number(createForm.entryFee),
           matchTimestamp: fromIstInputValue(createForm.matchTimestamp),
           prizePool: createForm.prizePool === '' ? null : Number(createForm.prizePool),
+          perKill: createForm.perKill === '' ? null : Number(createForm.perKill),
         }),
       })
       setMessage(`Match ${formatMatchLabel(data.match)} created for ${formatDate(data.match.match_timestamp)}.`)
-      setCreateForm({ mode: matchModes[0], entryFee: String(defaultFees[matchModes[0]]), matchTimestamp: '', prizePool: '', description: '' })
+      setCreateForm({ mode: matchModes[0], entryFee: String(defaultFees[matchModes[0]]), matchTimestamp: '', prizePool: '', perKill: '', description: '' })
       await loadOverview()
     } catch (error) { setMessage(error.message) }
   }
@@ -813,7 +817,7 @@ function AdminPanel({ onBack }) {
       {tab === 'withdrawals' && <WithdrawalReviewTable rows={filteredWithdrawals} busy={busy} highlight={highlight} onReview={reviewWithdrawal} onOpenUser={openUser} onViewUpload={viewUpload} />}
 
       {tab === 'matches' && <>
-        <section className="admin-card admin-create-match"><h2>Create new match</h2><p>Select any available mode, choose its time, and publish a custom prize.</p><form className="admin-create-form" onSubmit={submitCreateMatch}><label>Mode<select value={createForm.mode} onChange={(event) => setCreateForm({ ...createForm, mode: event.target.value, entryFee: String(defaultFees[event.target.value]) })}>{matchModes.map((mode) => <option key={mode} value={mode}>{mode}</option>)}</select></label><label>Entry fee<input type="number" min="1" value={createForm.entryFee} onChange={(event) => setCreateForm({ ...createForm, entryFee: event.target.value })} required /></label><label>Date and time (India time)<input type="datetime-local" value={createForm.matchTimestamp} onChange={(event) => setCreateForm({ ...createForm, matchTimestamp: event.target.value })} required /></label><label>Prize pool<input type="number" min="0" value={createForm.prizePool} onChange={(event) => setCreateForm({ ...createForm, prizePool: event.target.value })} placeholder="Optional" /></label><label>Description<textarea value={createForm.description} onChange={(event) => setCreateForm({ ...createForm, description: event.target.value })} placeholder="Per kill 20 Rs..." rows="3" /></label><button type="submit">Create match</button></form></section>
+        <section className="admin-card admin-create-match"><h2>Create new match</h2><p>Select any available mode, choose its time, and publish a custom prize.</p><form className="admin-create-form" onSubmit={submitCreateMatch}><label>Mode<select value={createForm.mode} onChange={(event) => setCreateForm({ ...createForm, mode: event.target.value, entryFee: String(defaultFees[event.target.value]) })}>{matchModes.map((mode) => <option key={mode} value={mode}>{mode}</option>)}</select></label><label>Entry fee<input type="number" min="1" value={createForm.entryFee} onChange={(event) => setCreateForm({ ...createForm, entryFee: event.target.value })} required /></label><label>Date and time (India time)<input type="datetime-local" value={createForm.matchTimestamp} onChange={(event) => setCreateForm({ ...createForm, matchTimestamp: event.target.value })} required /></label><label>Winning coins<input type="number" min="0" value={createForm.prizePool} onChange={(event) => setCreateForm({ ...createForm, prizePool: event.target.value })} placeholder="Default: 80% of fees" /></label><label>Per kill coins<input type="number" min="0" value={createForm.perKill} onChange={(event) => setCreateForm({ ...createForm, perKill: event.target.value })} placeholder={`Default: ${getDefaultPerKill(createForm.mode, createForm.entryFee)}`} /></label><label>Description<textarea value={createForm.description} onChange={(event) => setCreateForm({ ...createForm, description: event.target.value })} placeholder="Per kill 20 Rs..." rows="3" /></label><button type="submit">Create match</button></form></section>
         <section className="admin-card admin-match-lookup"><h2>Match control</h2><p>Enter a match number such as #05 (today&apos;s match 5) to see its teams, declare the winner and edit it.</p><div className="admin-lookup-row"><input value={matchLookup} onChange={(event) => setMatchLookup(event.target.value)} placeholder="#05" /><button type="button" onClick={() => selectMatch(matchLookup)}>Open match</button></div></section>
         {currentSelectedMatch && <MatchControl key={currentSelectedMatch.match_id} match={currentSelectedMatch} entries={overview.entries.filter((entry) => entry.match_id === currentSelectedMatch.match_id)} kills={overview.kills.filter((item) => item.match_id === currentSelectedMatch.match_id)} form={matchForm} setForm={editMatchForm} saveState={matchSaveState} onSubmit={submitMatchUpdate} onDelete={deleteSelectedMatch} onOpenUser={openUser} onDeclareWinner={(teamNo) => declareWinner(currentSelectedMatch.match_id, teamNo)} />}
         <div className="admin-filter-row admin-state-filter">
@@ -1029,7 +1033,7 @@ function MatchControl({ match, entries, kills, form, setForm, saveState = 'idle'
             </form>
           )}
         </div>
-        <form className="admin-match-form" onSubmit={onSubmit}><label>Entry fee<input type="number" min="1" value={form.entryFee} onChange={(event) => setForm({ ...form, entryFee: event.target.value })} required /></label><label>Match time (India time)<input type="datetime-local" value={form.matchTimestamp} onChange={(event) => setForm({ ...form, matchTimestamp: event.target.value })} /></label><label>Prize payout override<input type="number" min="0" value={form.prizePool} onChange={(event) => setForm({ ...form, prizePool: event.target.value })} placeholder="Default: 80% pool" /></label><label>Match description<textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Per kill 20 Rs... or Prize pool 40 Rs..." rows="4" /></label><label>Room ID<input name="roomId" value={form.roomId} onChange={(event) => setForm({ ...form, roomId: event.target.value })} placeholder="Shown to joined players 10 min before start" maxLength={40} /></label><label>Room password<input value={form.roomPassword} onChange={(event) => setForm({ ...form, roomPassword: event.target.value })} placeholder="Room password" maxLength={40} /></label><button type="submit" className={`admin-save-button is-${saveState}`} disabled={saveState === 'saving'} aria-live="polite">{saveButtonLabels[saveState]}</button></form>
+        <form className="admin-match-form" onSubmit={onSubmit}><label>Entry fee<input type="number" min="1" value={form.entryFee} onChange={(event) => setForm({ ...form, entryFee: event.target.value })} required /></label><label>Match time (India time)<input type="datetime-local" value={form.matchTimestamp} onChange={(event) => setForm({ ...form, matchTimestamp: event.target.value })} /></label><label>Winning coins<input type="number" min="0" value={form.prizePool} onChange={(event) => setForm({ ...form, prizePool: event.target.value })} placeholder="Default: 80% of fees" /></label><label>Per kill coins<input type="number" min="0" value={form.perKill} onChange={(event) => setForm({ ...form, perKill: event.target.value })} placeholder={`Default: ${getDefaultPerKill(match.mode, form.entryFee)}`} /></label><label>Match description<textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Per kill 20 Rs... or Prize pool 40 Rs..." rows="4" /></label><label>Room ID<input name="roomId" value={form.roomId} onChange={(event) => setForm({ ...form, roomId: event.target.value })} placeholder="Shown to joined players 10 min before start" maxLength={40} /></label><label>Room password<input value={form.roomPassword} onChange={(event) => setForm({ ...form, roomPassword: event.target.value })} placeholder="Room password" maxLength={40} /></label><button type="submit" className={`admin-save-button is-${saveState}`} disabled={saveState === 'saving'} aria-live="polite">{saveButtonLabels[saveState]}</button></form>
       </div>
     </section>
   )

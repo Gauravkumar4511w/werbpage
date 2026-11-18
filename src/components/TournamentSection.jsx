@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { DEFAULT_ENTRY_FEES, EDIT_LOCK_MS, MATCH_MODES, formatMatchNo, getMatchCapacity, getScheduledMatches, getWinningCoins } from '../../lib/match-schedule.js'
+import { DEFAULT_ENTRY_FEES, EDIT_LOCK_MS, MATCH_MODES, formatMatchNo, getMatchCapacity, getPerKillCoins, getScheduledMatches, getWinningCoins } from '../../lib/match-schedule.js'
 import freeFireMaxIcon from '../assets/hero-banner.jpg'
 import battleRoyalImage from '../assets/battelroyal.jpg'
 import clashSquadImage from '../assets/clashsquad.jpg'
@@ -21,6 +21,7 @@ function fromCatalog(match) {
     entryFee: Number(match.entry_fee) || DEFAULT_ENTRY_FEES[match.mode],
     matchTimestamp: Number(match.match_timestamp) || 0,
     prizePool: match.prize_pool,
+    perKill: match.per_kill,
     status: match.status || 'open',
     joinedCount: Number(match.joined_count) || 0,
   }
@@ -186,6 +187,7 @@ function TournamentSection({ tournamentsOpen, onBack, joinedMatches, onJoinMatch
                 const entryFee = match.entryFee || DEFAULT_ENTRY_FEES[match.mode]
                 const matchCapacity = getMatchCapacity(match.mode)
                 const winning = getWinningCoins({ mode: match.mode, entryFee, prizePool: match.prizePool })
+                const perKill = getPerKillCoins({ mode: match.mode, entryFee, perKill: match.perKill })
                 const joinedEntry = joinedMatches.find((entry) => entry.id === match.id)
                 const isJoined = Boolean(joinedEntry)
                 const joinedCount = match.joinedCount ?? (isJoined ? 1 : 0)
@@ -216,6 +218,7 @@ function TournamentSection({ tournamentsOpen, onBack, joinedMatches, onJoinMatch
                       <time>{formatTime(match.matchTimestamp)}</time>
                       <span className="match-entry-fee"><span className="coin-icon" aria-hidden="true"></span>{entryFee} coins</span>
                       <span className="match-win-coins">{winning.toLocaleString()} winning coins</span>
+                      {perKill > 0 && <span className="match-win-coins">{perKill} coins per kill</span>}
                       <span className={`match-capacity-badge${matchCapacity.unit === 'players' ? ' is-player-count' : ''}`} style={{ '--capacity-fill': `${fillPercent}%` }}>
                         <span>{joinedCount}/{matchCapacity.total} {matchCapacity.unit}</span>
                       </span>

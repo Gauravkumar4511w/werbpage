@@ -10,7 +10,7 @@ import { countUpcomingMatches } from "./myMatches.js";
 import Navbar from "./components/Navbar";
 import TournamentSection from "./components/TournamentSection";
 import WalletModal from "./components/WalletModal";
-import { EDIT_LOCK_MS, formatMatchNo, getTeamSize, getWinningCoins } from "../lib/match-schedule.js";
+import { EDIT_LOCK_MS, formatMatchNo, getPerKillCoins, getTeamSize, getWinningCoins } from "../lib/match-schedule.js";
 import { imageFileToDataUrl } from "./imageUpload.js";
 
 const userDataStorageKey = "nexus-user-data";
@@ -890,6 +890,7 @@ function App() {
   const detailsEntry = matchDetails ? visibleJoinedMatches.find((entry) => entry.id === matchDetails.id) : null;
   const detailsStarted = Boolean(matchDetails?.matchTimestamp) && currentTime >= matchDetails.matchTimestamp;
   const detailsWinning = matchDetails ? getWinningCoins(matchDetails) : null;
+  const detailsPerKill = matchDetails ? getPerKillCoins(matchDetails) : 0;
 
   return (
     <main className="gaming-page">
@@ -1071,6 +1072,12 @@ function App() {
                   <span>Winning coins</span>
                   <strong>{detailsWinning.toLocaleString()} coins</strong>
                 </div>
+                {detailsPerKill > 0 && (
+                  <div className="match-detail-win">
+                    <span>Per kill</span>
+                    <strong>{detailsPerKill} coins</strong>
+                  </div>
+                )}
                 <div>
                   <span>Start</span>
                   <strong>
