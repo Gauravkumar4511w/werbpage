@@ -5,7 +5,7 @@ import { after, before, test } from 'node:test'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { getDefaultPerKill, getPerKillCoins } from '../lib/match-schedule.js'
+import { getDefaultPerKill, getPerKillCoins, getWinningCoins } from '../lib/match-schedule.js'
 
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'arenacore-kill-coins-test-'))
 process.env.DATABASE_DIR = directory
@@ -55,12 +55,18 @@ before(async () => {
   admin = { authorization: `Bearer ${result.data.token}` }
 })
 
-test('Battle Royale Solo pays 4, 7 or 10 coins a kill for a 10, 15 or 25 coin entry', () => {
+test('Battle Royale Solo pays 4, 7 or 10 and Duo 2, 4 or 6 coins a kill for a 10, 15 or 25 coin entry', () => {
   assert.equal(getDefaultPerKill('Battle Royale Solo', 10), 4)
   assert.equal(getDefaultPerKill('Battle Royale Solo', 15), 7)
   assert.equal(getDefaultPerKill('Battle Royale Solo', 25), 10)
   assert.equal(getDefaultPerKill('Battle Royale Solo', 20), 7)
-  assert.equal(getDefaultPerKill('Battle Royale Duo', 15), 0)
+  assert.equal(getDefaultPerKill('Battle Royale Duo', 25), 6)
+  assert.equal(getDefaultPerKill('Battle Royale Duo', 15), 4)
+  assert.equal(getDefaultPerKill('Battle Royale Duo', 10), 2)
+  assert.equal(getDefaultPerKill('Battle Royale Squad', 15), 0)
+  assert.equal(getWinningCoins({ mode: 'Battle Royale Solo', entryFee: 10 }), 0)
+  assert.equal(getWinningCoins({ mode: 'Battle Royale Solo', entryFee: 10, prizePool: 50 }), 50)
+  assert.equal(getWinningCoins({ mode: 'Clash Squad 1v1', entryFee: 10 }), 16)
   // The admin's rate wins, including 0 to turn kill coins off.
   assert.equal(getPerKillCoins({ mode: 'Battle Royale Solo', entryFee: 10, perKill: 6 }), 6)
   assert.equal(getPerKillCoins({ mode: 'Battle Royale Solo', entryFee: 10, perKill: 0 }), 0)

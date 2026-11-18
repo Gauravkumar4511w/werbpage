@@ -102,7 +102,7 @@ test('each mode asks for one name per team member and names can be edited until 
   const duo = scheduled(monday, 'Battle Royale Duo')
   await assert.rejects(() => db.recordMatchEntry({ ...players[1], matchId: duo.id, identifiers: ['OnlyOne'] }, monday), /all 2/)
   const joined = await db.recordMatchEntry({ ...players[1], matchId: duo.id, identifiers: ['Alpha01', 'Bravo02'] }, monday)
-  assert.equal(joined.charged, 15)
+  assert.equal(joined.charged, 25)
 
   const edited = await db.recordMatchEntry({ ...players[1], matchId: duo.id, identifiers: ['Alpha01', 'Charlie3'] }, monday)
   assert.equal(edited.charged, 0)
@@ -154,15 +154,28 @@ test('re-registering a number cannot replace its password or undo a deactivation
 })
 
 test('the default prize pool counts the teams that actually joined', async () => {
-  const created = await request('/api/admin/matches/create', { headers: admin, body: { mode: 'Battle Royale Solo', entryFee: 100, matchTimestamp: Date.now() + 2 * hour } })
+  const created = await request('/api/admin/matches/create', { headers: admin, body: { mode: 'Lone Wolf 1v1', entryFee: 100, matchTimestamp: Date.now() + 2 * hour } })
   const match = created.data.match
-  for (const [index, player] of players.entries()) {
-    await request('/api/matches/entry', { body: { ...player, matchId: match.match_id, identifiers: [`Solo${index}`] } })
+  for (const [index, player] of players.slice(0, 2).entries()) {
+    await request('/api/matches/entry', { body: { ...player, matchId: match.match_id, identifiers: [`Wolf${index}`] } })
   }
   const result = await request('/api/admin/matches/confirm-result', { headers: admin, body: { matchId: match.match_id, winnerTeamKey: players[0].userKey } })
   assert.equal(result.status, 200, JSON.stringify(result.data))
-  assert.equal(result.data.payout.totalPool, 300)
-  assert.equal(result.data.payout.payoutPool, 240)
+  assert.equal(result.data.payout.totalPool, 200)
+  assert.equal(result.data.payout.payoutPool, 160)
+})
+
+test('a Battle Royale winner gets no winning coins unless the admin set them, since it pays per kill', async () => {
+  const create = (body) => request('/api/admin/matches/create', { headers: admin, body: { mode: 'Battle Royale Solo', entryFee: 100, matchTimestamp: Date.now() + 2 * hour, ...body } })
+  for (const [prizePool, expected] of [[undefined, 0], [150, 150]]) {
+    const match = (await create({ prizePool })).data.match
+    for (const [index, player] of players.entries()) {
+      await request('/api/matches/entry', { body: { ...player, matchId: match.match_id, identifiers: [`Solo${index}`] } })
+    }
+    const result = await request('/api/admin/matches/confirm-result', { headers: admin, body: { matchId: match.match_id, winnerTeamKey: players[0].userKey } })
+    assert.equal(result.status, 200, JSON.stringify(result.data))
+    assert.equal(result.data.payout.payoutPool, expected)
+  }
 })
 
 test('players can change their gamer tag, email and mobile number and log in with the new ones', async () => {

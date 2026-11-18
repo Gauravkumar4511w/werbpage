@@ -1068,10 +1068,12 @@ function App() {
                   <span>Entry</span>
                   <strong>{Number(matchDetails.entryFee || 0).toLocaleString()} coins</strong>
                 </div>
-                <div className="match-detail-win">
-                  <span>Winning coins</span>
-                  <strong>{detailsWinning.toLocaleString()} coins</strong>
-                </div>
+                {detailsWinning > 0 && (
+                  <div className="match-detail-win">
+                    <span>Winning coins</span>
+                    <strong>{detailsWinning.toLocaleString()} coins</strong>
+                  </div>
+                )}
                 {detailsPerKill > 0 && (
                   <div className="match-detail-win">
                     <span>Per kill</span>
