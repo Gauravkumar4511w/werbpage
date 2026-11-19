@@ -561,7 +561,7 @@ body { background: #07111c; }
 .live-dot { color: #ffc247; border-color: rgba(255,194,71,.5); }
 .coin-balance { border-color: rgba(255,194,71,.38); background: rgba(255,194,71,.08); }
 .avatar { border-color: #67d6ff; color: #67d6ff; background: rgba(103,214,255,.12); }
-.nav-showcase { background: linear-gradient(90deg, rgba(4,12,22,.95) 0%, rgba(4,12,22,.72) 34%, rgba(4,12,22,.18) 76%, rgba(4,12,22,.58) 100%), linear-gradient(0deg, rgba(4,12,22,.55), transparent 55%), url('./assets/freefire.jpg') center / cover; }
+.nav-showcase { background: linear-gradient(90deg, rgba(4,12,22,.95) 0%, rgba(4,12,22,.72) 34%, rgba(4,12,22,.18) 76%, rgba(4,12,22,.58) 100%), linear-gradient(0deg, rgba(4,12,22,.55), transparent 55%), url('./assets/freefire-india.jpg') center / cover; }
 .nav-showcase::before { background: linear-gradient(135deg, transparent 0 48%, rgba(255,194,71,.24) 48.2%, transparent 48.5%), repeating-linear-gradient(120deg, transparent 0 54px, rgba(103,214,255,.045) 55px 56px); }
 .nav-showcase::after { background: linear-gradient(90deg, transparent, rgba(255,194,71,.55), transparent) 0 100% / 100% 1px no-repeat; }
 .eyebrow, .secondary-cta { color: #ffc247; }
@@ -698,10 +698,10 @@ body { background: #07111c; }
 }
 
 /* Broadcast glass direction: keep the layout, unify every surface with the artwork */
-body { background: #050b12 url('./assets/freefire.jpg') center / cover fixed; }
-.gaming-page { min-height: 100vh; background: linear-gradient(rgba(4,10,17,.72), rgba(4,10,17,.88)), url('./assets/freefire.jpg') center / cover fixed; }
+body { background: #050b12 url('./assets/freefire-india.jpg') center / cover fixed; }
+.gaming-page { min-height: 100vh; background: linear-gradient(rgba(4,10,17,.72), rgba(4,10,17,.88)), url('./assets/freefire-india.jpg') center / cover fixed; }
 .navbar { background: rgba(4,10,17,.3); border-bottom-color: rgba(255,194,71,.28); box-shadow: 0 8px 28px rgba(0,0,0,.2); }
-.nav-showcase { background: linear-gradient(90deg, rgba(4,10,17,.82), rgba(4,10,17,.42) 52%, rgba(4,10,17,.62)), url('./assets/freefire.jpg') center / cover; }
+.nav-showcase { background: linear-gradient(90deg, rgba(4,10,17,.82), rgba(4,10,17,.42) 52%, rgba(4,10,17,.62)), url('./assets/freefire-india.jpg') center / cover; }
 .library-section, .tournament-section { background: rgba(5,14,24,.48); backdrop-filter: blur(5px); }
 .game-card, .match-history-row, .tournament-day, .scheduled-match { background: rgba(7,19,31,.45); border-color: rgba(103,214,255,.3); box-shadow: inset 0 1px rgba(255,255,255,.08), 0 14px 30px rgba(0,0,0,.2); }
 .date-heading, .day-heading { background: rgba(8,22,35,.42); }
@@ -820,7 +820,7 @@ body { background: #07111c; }
 .live-dot { color: #ffc247; border-color: rgba(255,194,71,.5); }
 .coin-balance { border-color: rgba(255,194,71,.38); background: rgba(255,194,71,.08); }
 .avatar { border-color: #67d6ff; color: #67d6ff; background: rgba(103,214,255,.12); }
-.nav-showcase { background: linear-gradient(90deg, rgba(4,12,22,.95) 0%, rgba(4,12,22,.72) 34%, rgba(4,12,22,.18) 76%, rgba(4,12,22,.58) 100%), linear-gradient(0deg, rgba(4,12,22,.55), transparent 55%), url('./assets/freefire.jpg') center / cover; }
+.nav-showcase { background: linear-gradient(90deg, rgba(4,12,22,.95) 0%, rgba(4,12,22,.72) 34%, rgba(4,12,22,.18) 76%, rgba(4,12,22,.58) 100%), linear-gradient(0deg, rgba(4,12,22,.55), transparent 55%), url('./assets/freefire-india.jpg') center / cover; }
 .nav-showcase::before { background: linear-gradient(135deg, transparent 0 48%, rgba(255,194,71,.24) 48.2%, transparent 48.5%), repeating-linear-gradient(120deg, transparent 0 54px, rgba(103,214,255,.045) 55px 56px); }
 .nav-showcase::after { background: linear-gradient(90deg, transparent, rgba(255,194,71,.55), transparent) 0 100% / 100% 1px no-repeat; }
 .eyebrow, .secondary-cta { color: #ffc247; }
