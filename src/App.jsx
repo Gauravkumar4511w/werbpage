@@ -10,6 +10,7 @@ import { countUpcomingMatches } from "./myMatches.js";
 import Navbar from "./components/Navbar";
 import TournamentSection from "./components/TournamentSection";
 import WalletModal from "./components/WalletModal";
+import { MIN_TOPUP_COINS, MIN_WITHDRAW_COINS } from "../lib/wallet-limits.js";
 import { EDIT_LOCK_MS, formatMatchNo, getEntryCost, getPerKillCoins, getTeamSize, getWinningCoins } from "../lib/match-schedule.js";
 import { imageFileToDataUrl } from "./imageUpload.js";
 
@@ -363,7 +364,7 @@ function App() {
   const openWalletForTopUp = (neededCoins, mode) => {
     window.history.pushState({ view: "wallet" }, "", "#wallet");
     setWalletTab("buy");
-    setBuyAmount(String(Math.max(50, neededCoins)));
+    setBuyAmount(String(Math.max(MIN_TOPUP_COINS, neededCoins)));
     const message = `You need ${neededCoins.toLocaleString()} more coins to join ${mode}. Buy coins below, then tap Join again.`;
     setWalletMessage(message);
     showNotice(message, "error");
@@ -754,8 +755,8 @@ function App() {
   const startUpiPayment = (amount) => {
     if (!requireLogin()) return;
 
-    if (!Number.isInteger(amount) || amount < 50) {
-      setWalletMessage("Buy at least 50 whole coins.");
+    if (!Number.isInteger(amount) || amount < MIN_TOPUP_COINS) {
+      setWalletMessage(`Buy at least ${MIN_TOPUP_COINS} whole coins.`);
       return;
     }
     const upiId = import.meta.env.VITE_UPI_ID;
@@ -828,8 +829,8 @@ function App() {
     if (!requireLogin()) return;
 
     const amount = Number(withdrawAmount);
-    if (!Number.isInteger(amount) || amount < 50) {
-      setWalletMessage("Withdraw at least 50 whole coins.");
+    if (!Number.isInteger(amount) || amount < MIN_WITHDRAW_COINS) {
+      setWalletMessage(`Withdraw at least ${MIN_WITHDRAW_COINS} whole coins.`);
       return;
     }
     if (amount > coins) {

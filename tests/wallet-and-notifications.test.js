@@ -69,8 +69,10 @@ test('the same UTR cannot be claimed twice and bad UTRs are refused', async () =
   assert.equal(duplicate.status, 409)
   const invalid = await request('/api/payments/request', { body: { ...player, amount: 500, utr: 'x' } })
   assert.equal(invalid.status, 400)
-  const tooSmall = await request('/api/payments/request', { body: { ...player, amount: 10, utr: '999999999999' } })
+  // The smallest top-up is 10 coins.
+  const tooSmall = await request('/api/payments/request', { body: { ...player, amount: 9, utr: '999999999999' } })
   assert.equal(tooSmall.status, 400)
+  assert.match(tooSmall.data.message, /at least 10/)
 })
 
 test('rejected top-ups add nothing', async () => {
@@ -177,4 +179,18 @@ test('requests arriving together never hit a locked database', async () => {
   const again = await Promise.all(Array.from({ length: 6 }, () => request('/api/admin/users/balance', { headers: admin, body: { userKey: player.userKey, wallet: 'credit', amount: 1 } })))
   assert.ok(again.every((result) => result.status === 200))
   assert.equal((await request('/api/users/wallet', { body: player })).data.creditCoins, credited + 6)
+})
+
+test('10 coins is the smallest top-up and the smallest withdrawal', async () => {
+  const topUp = await request('/api/payments/request', { body: { ...player, amount: 10, utr: '710000000010' } })
+  assert.equal(topUp.status, 201, JSON.stringify(topUp.data))
+
+  const before = (await request('/api/users/wallet', { body: player })).data.winningCoins
+  const details = { upiId: 'p@upi', upiName: 'Wallet Player' }
+  const tooSmall = await request('/api/withdrawals/request', { body: { ...player, amount: 9, method: 'upi', details } })
+  assert.equal(tooSmall.status, 400)
+  assert.match(tooSmall.data.message, /at least 10/)
+  const smallest = await request('/api/withdrawals/request', { body: { ...player, amount: 10, method: 'upi', details } })
+  assert.equal(smallest.status, 201, JSON.stringify(smallest.data))
+  assert.equal(smallest.data.wallet.winningCoins, before - 10)
 })

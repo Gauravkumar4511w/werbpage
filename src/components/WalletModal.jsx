@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { MIN_TOPUP_COINS, MIN_WITHDRAW_COINS } from '../../lib/wallet-limits.js'
 
 function WalletModal({ coins, creditCoins, winningCoins, withdrawableCoins, walletTab, setWalletTab, onClose, buyAmount, setBuyAmount, onUpiBuy, onCancelPayment, onOpenUpiPayment, manualUtr, setManualUtr, pendingPayment, onSubmitPaymentProof, paymentHistory = [], withdrawAmount, setWithdrawAmount, withdrawMethod, setWithdrawMethod, withdrawDetails, setWithdrawDetails, setWithdrawalScreenshot, requestWithdrawal, walletMessage }) {
   const updateDetails = (field, value) => setWithdrawDetails({ ...withdrawDetails, [field]: value })
@@ -73,7 +74,7 @@ function WalletModal({ coins, creditCoins, winningCoins, withdrawableCoins, wall
               <>
                 <div className="coin-packages">{[[500, 'Starter'], [1200, 'Player'], [2500, 'Elite']].map(([amount, label]) => <button type="button" key={amount} onClick={() => onUpiBuy(amount)}><strong>{amount.toLocaleString()}</strong><span>{label} pack</span><small>Pay ₹{amount.toLocaleString()} by UPI</small></button>)}</div>
                 <form className="coin-custom-form" onSubmit={(event) => { event.preventDefault(); onUpiBuy(Number(buyAmount)) }}>
-                  <label>Or enter coins (1 coin = ₹1)<input type="number" min="50" step="1" value={buyAmount} onChange={(event) => setBuyAmount(event.target.value)} placeholder="Minimum 50" required /></label>
+                  <label>Or enter coins (1 coin = ₹1)<input type="number" min={MIN_TOPUP_COINS} step="1" value={buyAmount} onChange={(event) => setBuyAmount(event.target.value)} placeholder={`Minimum ${MIN_TOPUP_COINS}`} required /></label>
                   <button className="auth-submit" type="submit">Show payment QR <span>-&gt;</span></button>
                 </form>
               </>
@@ -99,10 +100,10 @@ function WalletModal({ coins, creditCoins, winningCoins, withdrawableCoins, wall
               <div><span>Winning coins</span><strong>{winningCoins.toLocaleString()}</strong><small>Withdrawable</small></div>
             </div>
             <div className="payment-methods"><button className={withdrawMethod === 'upi' ? 'selected' : ''} type="button" onClick={() => setWithdrawMethod('upi')}>UPI</button><button className={withdrawMethod === 'bank' ? 'selected' : ''} type="button" onClick={() => setWithdrawMethod('bank')}>Bank transfer</button></div>
-            <label>Winning coins to withdraw<input type="number" min="50" max={withdrawableCoins} step="1" value={withdrawAmount} onChange={(event) => setWithdrawAmount(event.target.value)} placeholder="50 to winning balance" required /></label>
+            <label>Winning coins to withdraw<input type="number" min={MIN_WITHDRAW_COINS} max={withdrawableCoins} step="1" value={withdrawAmount} onChange={(event) => setWithdrawAmount(event.target.value)} placeholder={`${MIN_WITHDRAW_COINS} to winning balance`} required /></label>
             {withdrawMethod === 'upi' ? <div className="bank-fields"><label>UPI ID<input value={withdrawDetails.upiId} onChange={(event) => updateDetails('upiId', event.target.value)} placeholder="player@upi" required /></label><label>Name on UPI account<input value={withdrawDetails.upiName} onChange={(event) => updateDetails('upiName', event.target.value)} placeholder="As shown in your UPI app" maxLength={60} autoComplete="name" required /></label></div> : <div className="bank-fields"><label>Account holder name<input value={withdrawDetails.accountName} onChange={(event) => updateDetails('accountName', event.target.value)} placeholder="Full name" required /></label><label>Account number<input inputMode="numeric" value={withdrawDetails.accountNumber} onChange={(event) => updateDetails('accountNumber', event.target.value.replace(/\D/g, ''))} placeholder="9-18 digits" required /></label><label>IFSC code<input value={withdrawDetails.ifsc} onChange={(event) => updateDetails('ifsc', event.target.value.toUpperCase())} placeholder="ABCD0123456" required /></label></div>}
             {withdrawMethod === 'upi' && <label>UPI QR screenshot<input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setWithdrawalScreenshot(event.target.files?.[0] || null)} required /></label>}
-            <p>{withdrawableCoins >= 50 ? `Withdraw between 50 and ${withdrawableCoins.toLocaleString()} winning coins.` : `You need at least 50 winning coins to withdraw (you have ${withdrawableCoins.toLocaleString()}). Win matches to earn them.`} Purchased coins cannot be withdrawn.</p>
+            <p>{withdrawableCoins >= MIN_WITHDRAW_COINS ? `Withdraw between ${MIN_WITHDRAW_COINS} and ${withdrawableCoins.toLocaleString()} winning coins.` : `You need at least ${MIN_WITHDRAW_COINS} winning coins to withdraw (you have ${withdrawableCoins.toLocaleString()}). Win matches to earn them.`} Purchased coins cannot be withdrawn.</p>
             <button className="auth-submit" type="submit">Request withdrawal <span>-&gt;</span></button>
           </form>
         )}
