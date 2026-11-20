@@ -1254,3 +1254,108 @@ body { background: #07111c; }
 .match-category.is-expanded { min-height: 0; align-content: start; }
 .tournament-date-group.is-detail-view { align-content: start; }
 .match-category.is-expanded .match-grid { align-items: start; padding-top: 4px; }
+
+/* Phone navigation: a floating dock with the four main pages at the bottom, a glowing pill that
+   slides to the open page, a menu button that turns into an X, and the menu as a sheet whose rows
+   come in one after another. Desktop keeps its top bar as it is. */
+.phone-dock { display: none; }
+@media (max-width: 760px) {
+  .phone-dock {
+    --dock-pad: 6px;
+    position: fixed;
+    z-index: 40;
+    right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    left: 12px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    height: 66px;
+    padding: var(--dock-pad);
+    border: 1px solid rgba(255, 194, 71, .2);
+    border-radius: 24px;
+    background: linear-gradient(180deg, rgba(14, 26, 42, .86), rgba(6, 13, 22, .92));
+    box-shadow: 0 18px 40px rgba(0, 0, 0, .55), inset 0 1px rgba(255, 255, 255, .08);
+    backdrop-filter: blur(16px) saturate(1.3);
+    -webkit-backdrop-filter: blur(16px) saturate(1.3);
+    animation: dock-rise .6s cubic-bezier(.2, .9, .25, 1.2) both;
+  }
+  /* The pill behind the open tab; it slides with a little overshoot. */
+  .phone-dock-glow {
+    position: absolute;
+    top: var(--dock-pad);
+    bottom: var(--dock-pad);
+    left: var(--dock-pad);
+    width: calc((100% - var(--dock-pad) * 2) / 4);
+    border-radius: 18px;
+    background: radial-gradient(120% 90% at 50% 0%, rgba(255, 224, 140, .95), rgba(255, 176, 46, .9) 55%, rgba(255, 128, 40, .88));
+    box-shadow: 0 8px 22px -6px rgba(255, 176, 46, .75), inset 0 1px rgba(255, 255, 255, .5);
+    transform: translateX(calc(var(--dock-index, 0) * 100%));
+    transition: transform .45s cubic-bezier(.3, 1.35, .45, 1);
+  }
+  .phone-dock-glow::after { position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, .55) 48%, transparent 66%); background-size: 250% 100%; content: ''; animation: dock-shine 3.2s ease-in-out infinite; }
+  .phone-dock-tab {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 3px;
+    min-width: 0;
+    color: #8d9aa8;
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: color .3s ease, transform .2s ease;
+  }
+  .phone-dock-tab:active { transform: scale(.9); }
+  .phone-dock-tab:focus-visible { outline: 2px solid #ffc247; outline-offset: -2px; border-radius: 18px; }
+  .phone-dock-tab.is-active { color: #1a1206; }
+  .phone-dock-icon { position: relative; display: grid; place-items: center; width: 26px; height: 26px; }
+  .phone-dock-icon svg { width: 23px; height: 23px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  .phone-dock-tab.is-active .phone-dock-icon { animation: dock-pop .5s cubic-bezier(.3, 1.6, .5, 1) both; }
+  .phone-dock-label { max-width: 100%; overflow: hidden; font-size: 9.5px; font-weight: 800; letter-spacing: .05em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+  .phone-dock-badge { position: absolute; top: -6px; right: -9px; display: grid; min-width: 17px; height: 17px; padding: 0 4px; place-items: center; border: 2px solid #0a1420; border-radius: 9px; color: #fff; background: #ff4d62; font-family: var(--mono); font-size: 9px; font-weight: 800; animation: badge-pulse 1.8s ease-in-out infinite; }
+
+  /* Room at the bottom of every page so the dock never covers content. */
+  .gaming-page { padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
+  .nav-showcase { min-height: calc(100svh - 70px - 92px); padding-bottom: 28px; }
+
+  /* Top bar: the logo bars bounce like a level meter, and the menu button turns into an X. */
+  .brand-mark i { animation: brand-meter 1.6s ease-in-out infinite; transform-origin: bottom; }
+  .brand-mark i:nth-child(2) { animation-delay: .2s; }
+  .brand-mark i:nth-child(3) { animation-delay: .4s; }
+  .menu-toggle { position: relative; display: grid; place-content: center; gap: 4px; width: 38px; height: 38px; border-radius: 12px; transition: background .25s ease, border-color .25s ease; }
+  .menu-toggle span:not(.sr-only) { transition: transform .35s cubic-bezier(.3, 1.4, .5, 1), opacity .2s ease, width .3s ease; }
+  .menu-toggle span:nth-child(2) { width: 14px !important; justify-self: end; }
+  .menu-toggle[aria-expanded='true'] { border-color: rgba(255, 194, 71, .6); background: rgba(255, 194, 71, .14); }
+  .menu-toggle[aria-expanded='true'] span:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+  .menu-toggle[aria-expanded='true'] span:nth-child(2) { opacity: 0; transform: translateX(8px); }
+  .menu-toggle[aria-expanded='true'] span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+  .quick-avatar .avatar { transition: transform .2s ease; }
+  .quick-avatar:active .avatar, .nav-quick .coin-balance:active { transform: scale(.92); }
+  .nav-quick .coin-balance { border-radius: 12px; }
+
+  /* The menu holds the account and the extras; the four pages live in the dock. */
+  .nav-content { border-radius: 0 0 24px 24px; }
+  .nav-content.is-open { animation: sheet-drop .4s cubic-bezier(.2, .9, .3, 1.1) both; }
+  .nav-content .nav-links { display: none; }
+  .nav-content .nav-actions { margin-top: 2px; }
+  .nav-content .nav-actions > * { border-radius: 14px !important; }
+  .nav-content.is-open .nav-actions > * { animation: row-in .45s cubic-bezier(.2, .9, .3, 1.1) both; }
+  .nav-content.is-open .nav-actions > :nth-child(2) { animation-delay: .06s; }
+  .nav-content.is-open .nav-actions > :nth-child(3) { animation-delay: .12s; }
+  .nav-content.is-open .nav-actions > :nth-child(4) { animation-delay: .18s; }
+  .nav-content.is-open .nav-actions > :nth-child(5) { animation-delay: .24s; }
+  .nav-scrim { animation: scrim-in .3s ease both; backdrop-filter: blur(3px); }
+}
+@keyframes dock-rise { from { opacity: 0; transform: translateY(120%) scale(.9); } to { opacity: 1; transform: none; } }
+@keyframes dock-shine { 0%, 55% { background-position: 150% 0; } 100% { background-position: -100% 0; } }
+@keyframes dock-pop { 0% { transform: scale(.6) translateY(4px); } 60% { transform: scale(1.18) translateY(-2px); } 100% { transform: none; } }
+@keyframes badge-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(255, 77, 98, .55); } 50% { box-shadow: 0 0 0 6px rgba(255, 77, 98, 0); } }
+@keyframes brand-meter { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(.55); } }
+@keyframes sheet-drop { from { opacity: 0; transform: translateY(-14px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes row-in { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+@keyframes scrim-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .phone-dock, .phone-dock-glow::after, .phone-dock-tab.is-active .phone-dock-icon, .phone-dock-badge, .brand-mark i, .nav-content.is-open, .nav-content.is-open .nav-actions > *, .nav-scrim { animation: none; }
+  .phone-dock-glow, .menu-toggle span:not(.sr-only) { transition: none; }
+}

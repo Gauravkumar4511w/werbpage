@@ -1,5 +1,13 @@
 import { useInstallPrompt } from '../installPrompt.js'
 
+// Icons for the phone dock, drawn with one stroke so they take the tab's colour.
+const dockIcons = {
+  discover: <><circle cx="12" cy="12" r="9" /><path d="m15.5 8.5-2 5-5 2 2-5 5-2Z" /></>,
+  history: <><path d="M3.5 12a8.5 8.5 0 1 0 2.5-6" /><path d="M3.5 4.5V9H8" /><path d="M12 7.5V12l3 2" /></>,
+  matches: <><circle cx="12" cy="12" r="7" /><circle cx="12" cy="12" r="2.5" /><path d="M12 2v4M12 18v4M2 12h4M18 12h4" /></>,
+  mine: <><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h11A2.5 2.5 0 0 1 20 7.5v2a2.5 2.5 0 0 0 0 5v2a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5v-2a2.5 2.5 0 0 0 0-5v-2Z" /><path d="M10 9.5h4M10 14.5h4" /></>,
+}
+
 function Navbar({ menuOpen, setMenuOpen, player, setAuthOpen, onHome, onHistory, libraryOpen, tournamentsOpen, myMatchesOpen, onMyMatches, upcomingMatchCount, onTournaments, onCoinClick, coinBalance, onAdmin, playerLevel = 1 }) {
   const closeMenu = () => setMenuOpen(false)
   const openWallet = () => { closeMenu(); onCoinClick() }
@@ -7,8 +15,16 @@ function Navbar({ menuOpen, setMenuOpen, player, setAuthOpen, onHome, onHistory,
   const initials = player ? player.name.slice(0, 2).toUpperCase() : 'AC'
   const { canInstall, install } = useInstallPrompt()
   const installApp = () => { closeMenu(); install() }
+  const dockTabs = [
+    { key: 'discover', label: 'Discover', href: '#discover', onClick: onHome, active: !libraryOpen && !tournamentsOpen && !myMatchesOpen },
+    { key: 'history', label: 'History', href: '#library', onClick: onHistory, active: libraryOpen },
+    { key: 'matches', label: 'Matches', href: '#tournaments', onClick: onTournaments, active: tournamentsOpen },
+    { key: 'mine', label: 'My Matches', href: '#my-matches', onClick: onMyMatches, active: myMatchesOpen, badge: upcomingMatchCount },
+  ]
+  const activeTab = Math.max(0, dockTabs.findIndex((tab) => tab.active))
 
   return (
+    <>
     <nav className="navbar" aria-label="Main navigation">
       <a className="brand" href="#top" aria-label="ArenaCore home" onClick={onHome}>
         <span className="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
@@ -40,7 +56,7 @@ function Navbar({ menuOpen, setMenuOpen, player, setAuthOpen, onHome, onHistory,
         <div className="nav-links">
           <a className={`nav-link${!libraryOpen && !tournamentsOpen && !myMatchesOpen ? ' active' : ''}`} href="#discover" onClick={onHome}>Discover</a>
           <a className={`nav-link${libraryOpen ? ' active' : ''}`} href="#library" onClick={onHistory}>History</a>
-          <a className={`nav-link${tournamentsOpen ? ' active' : ''}`} href="#tournaments" onClick={onTournaments}>Matches <span className="live-dot">LIVE</span></a>
+          <a className={`nav-link${tournamentsOpen ? ' active' : ''}`} href="#tournaments" onClick={onTournaments}>Matches</a>
           <a className={`nav-link${myMatchesOpen ? ' active' : ''}`} href="#my-matches" onClick={onMyMatches}>My Matches{upcomingMatchCount > 0 && <span className="my-matches-count" aria-label={`${upcomingMatchCount} upcoming`}>{upcomingMatchCount}</span>}</a>
         </div>
         <div className="nav-actions">
@@ -61,6 +77,28 @@ function Navbar({ menuOpen, setMenuOpen, player, setAuthOpen, onHome, onHistory,
       </div>
       {menuOpen && <button className="nav-scrim" type="button" aria-label="Close menu" onClick={closeMenu} />}
     </nav>
+
+    {/* Phones get the four main pages in a dock at the bottom, in thumb reach. It sits outside the
+        top bar, whose backdrop blur would otherwise pin it to the bar. */}
+    <nav className="phone-dock" aria-label="Quick navigation" style={{ '--dock-index': activeTab }}>
+      <span className="phone-dock-glow" aria-hidden="true" />
+      {dockTabs.map((tab) => (
+        <a
+          key={tab.key}
+          className={`phone-dock-tab${tab.active ? ' is-active' : ''}`}
+          href={tab.href}
+          aria-current={tab.active ? 'page' : undefined}
+          onClick={(event) => { closeMenu(); tab.onClick(event) }}
+        >
+          <span className="phone-dock-icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true">{dockIcons[tab.key]}</svg>
+            {tab.badge > 0 && <span className="phone-dock-badge" aria-label={`${tab.badge} upcoming`}>{tab.badge}</span>}
+          </span>
+          <span className="phone-dock-label">{tab.label}</span>
+        </a>
+      ))}
+    </nav>
+    </>
   )
 }
 
