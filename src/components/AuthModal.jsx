@@ -11,7 +11,7 @@ function PasswordField({ label, value, onChange, showPassword, setShowPassword, 
   return <label>{label}<div className="password-field"><input type={showPassword ? 'text' : 'password'} value={value} onChange={onChange} placeholder="6+ characters" autoComplete={autoComplete} required /><button type="button" onClick={() => setShowPassword((visible) => !visible)}>{showPassword ? 'Hide' : 'Show'}</button></div></label>
 }
 
-function AuthModal({ authOpen, setAuthOpen, authMode, setAuthMode, showPassword, setShowPassword, authError, setAuthError, form, setForm, handleAuthSubmit, authBusy, otpChallenge, onResendOtp, onResetOtp, onGoogleCredential, player, profileStats, handleSignOut, onUpdateProfile }) {
+function AuthModal({ authOpen, setAuthOpen, authMode, setAuthMode, showPassword, setShowPassword, authError, setAuthError, form, setForm, handleAuthSubmit, authBusy, otpChallenge, onResendOtp, onResetOtp, onGoogleCredential, player, profileStats, handleSignOut, onUpdateProfile, required = false }) {
   const emptyProfileForm = { name: null, email: null, phone: null }
   const [profileForm, setProfileForm] = useState(emptyProfileForm)
   const [profileError, setProfileError] = useState('')
@@ -85,9 +85,10 @@ function AuthModal({ authOpen, setAuthOpen, authMode, setAuthMode, showPassword,
   }[authMode]
 
   return (
-    <div className="auth-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setAuthOpen(false)}>
+    // While sign-in is required the box cannot be closed: no X, and tapping outside does nothing.
+    <div className={`auth-backdrop${required ? ' is-required' : ''}`} role="presentation" onMouseDown={(event) => !required && event.target === event.currentTarget && setAuthOpen(false)}>
       <section className="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
-        <button className="auth-close" type="button" aria-label="Close sign in" onClick={() => setAuthOpen(false)}>x</button>
+        {!required && <button className="auth-close" type="button" aria-label="Close sign in" onClick={() => setAuthOpen(false)}>x</button>}
         <div className="auth-kicker"><span></span> ARENACORE ACCOUNT</div>
         <h2 id="auth-title">{copy[authMode].title}</h2>
         <p className="auth-subtitle">{copy[authMode].subtitle}</p>

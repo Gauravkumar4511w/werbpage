@@ -1378,3 +1378,15 @@ body { background: #07111c; }
   .phone-dock.is-idle .phone-dock-glow { opacity: 0; transform: translateX(0) scale(.6); }
   .phone-dock-glow { transition: transform .45s cubic-bezier(.3, 1.35, .45, 1), opacity .25s ease; }
 }
+
+/* Login first: signed-out visitors see only the logo and the sign-in box on the Free Fire India art. */
+.login-gate { position: relative; isolation: isolate; min-height: 100svh; padding: 0; background: transparent; }
+.login-gate::before { position: fixed; z-index: -1; inset: 0; display: block; background: linear-gradient(180deg, rgba(5,11,19,.55), rgba(5,11,19,.85)), url('./assets/freefire-india.jpg') center / cover no-repeat; content: ''; }
+.login-gate-brand { position: fixed; z-index: 101; top: calc(18px + env(safe-area-inset-top)); left: 50%; display: inline-flex; align-items: center; gap: 10px; color: #fff; font-family: var(--heading); font-size: 22px; letter-spacing: .08em; transform: translateX(-50%); animation: gate-brand-in .6s ease-out both; }
+.login-gate-brand .brand-mark i { background: #ffc247; }
+.login-gate-brand .brand-dot { color: #ffc247; }
+.auth-backdrop.is-required { padding-top: 72px; background: rgba(4,8,14,.35); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); }
+.auth-backdrop.is-required .auth-modal { animation: gate-card-in .5s cubic-bezier(.2,.9,.3,1.1) both; }
+@keyframes gate-brand-in { from { opacity: 0; transform: translate(-50%, -10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes gate-card-in { from { opacity: 0; transform: translateY(18px) scale(.98); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .login-gate-brand, .auth-backdrop.is-required .auth-modal { animation: none; } }

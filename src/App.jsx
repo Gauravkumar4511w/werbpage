@@ -887,6 +887,56 @@ function App() {
     setWithdrawalScreenshot(null);
   };
 
+  // Signed-out visitors (on the site or the installed app) see only the login screen until they sign
+  // in; then they land on whatever page they opened. The admin page has its own login.
+  const loginRequired = !player && !adminOpen;
+  const authModal = (
+    <AuthModal
+      required={loginRequired}
+      authOpen={loginRequired || authOpen}
+      setAuthOpen={setAuthOpen}
+      authMode={authMode}
+      setAuthMode={setAuthMode}
+      showPassword={showPassword}
+      setShowPassword={setShowPassword}
+      authError={authError}
+      setAuthError={setAuthError}
+      form={form}
+      setForm={setForm}
+      handleAuthSubmit={handleAuthSubmit}
+      authBusy={authBusy}
+      otpChallenge={otpChallenge}
+      onResendOtp={sendOtp}
+      onResetOtp={resetOtp}
+      onGoogleCredential={handleGoogleCredential}
+      player={player}
+      profileStats={profileStats}
+      handleSignOut={handleSignOut}
+      onUpdateProfile={handleUpdateProfile}
+    />
+  );
+
+  // Shown on the login screen too, so a refused or signed-out account still sees why.
+  const noticeBanner = notice && (
+    <div className={`app-notice is-${notice.tone}`} role={notice.tone === "error" ? "alert" : "status"} key={notice.key}>
+      <span>{notice.text}</span>
+      <button type="button" aria-label="Dismiss message" onClick={() => setNotice(null)}>×</button>
+    </div>
+  );
+
+  if (loginRequired) {
+    return (
+      <main className="gaming-page login-gate">
+        <div className="login-gate-brand" aria-hidden="true">
+          <span className="brand-mark"><i></i><i></i><i></i></span>
+          <span>ARENA<span className="brand-dot">CORE.</span></span>
+        </div>
+        {authModal}
+        {noticeBanner}
+      </main>
+    );
+  }
+
   const detailsEntry = matchDetails ? visibleJoinedMatches.find((entry) => entry.id === matchDetails.id) : null;
   const detailsStarted = Boolean(matchDetails?.matchTimestamp) && currentTime >= matchDetails.matchTimestamp;
   const detailsWinning = matchDetails ? getWinningCoins(matchDetails) : null;
@@ -980,28 +1030,7 @@ function App() {
       ) : (
         <HeroSection openTournaments={openTournaments} openMyMatches={openMyMatches} totalAccounts={totalAccounts} />
       )}
-      <AuthModal
-        authOpen={authOpen}
-        setAuthOpen={setAuthOpen}
-        authMode={authMode}
-        setAuthMode={setAuthMode}
-        showPassword={showPassword}
-        setShowPassword={setShowPassword}
-        authError={authError}
-        setAuthError={setAuthError}
-        form={form}
-        setForm={setForm}
-        handleAuthSubmit={handleAuthSubmit}
-        authBusy={authBusy}
-        otpChallenge={otpChallenge}
-        onResendOtp={sendOtp}
-        onResetOtp={resetOtp}
-        onGoogleCredential={handleGoogleCredential}
-        player={player}
-        profileStats={profileStats}
-        handleSignOut={handleSignOut}
-        onUpdateProfile={handleUpdateProfile}
-      />
+      {authModal}
       {walletOpen && (
         <WalletModal
           key={pendingPayment?.expiresAt || "wallet"}
@@ -1229,12 +1258,7 @@ function App() {
           </div>
         </div>
       )}
-      {notice && (
-        <div className={`app-notice is-${notice.tone}`} role={notice.tone === "error" ? "alert" : "status"} key={notice.key}>
-          <span>{notice.text}</span>
-          <button type="button" aria-label="Dismiss message" onClick={() => setNotice(null)}>×</button>
-        </div>
-      )}
+      {noticeBanner}
     </main>
   );
 }
