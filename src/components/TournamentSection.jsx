@@ -173,7 +173,8 @@ function TournamentSection({ tournamentsOpen, onBack, joinedMatches, onJoinMatch
             {expandedMode && <button className="matches-back" type="button" onClick={() => setExpandedMode(null)}>&lt;- Back to modes</button>}
             {matchGroups.filter((group) => !expandedMode || group.name === expandedMode).map((group) => (
               <section className={`tournament-day match-category${expandedMode === group.name ? ' is-expanded' : ''}`} key={`${day.date}-${group.name}`}>
-                <div
+                {/* Once a mode is open its cards say which mode it is, so the big banner is left out. */}
+                {expandedMode !== group.name && <div
                   className={`category-heading theme-${getModeFamily(group.name).key}${group.name.startsWith('Battle Royale') ? ' mode-battle-royale' : ''}${group.name.startsWith('Clash Squad') ? ' mode-clash-squad' : ''}${group.name === 'Clash Squad 1v1' ? ' mode-one-v-one' : ''}${group.name === 'Lone Wolf 1v1' ? ' mode-lone-wolf' : ''}`}
                   style={{
                     backgroundImage: `url(${getModeImage(group.name)})`,
@@ -204,7 +205,7 @@ function TournamentSection({ tournamentsOpen, onBack, joinedMatches, onJoinMatch
                       </span>
                     )
                   })()}
-                </div>
+                </div>}
                 {expandedMode === group.name && <div className="match-grid">
                   {day.matches.filter((match) => group.modes.includes(match.mode)).map((match) => {
                 const entryFee = match.entryFee || DEFAULT_ENTRY_FEES[match.mode]
