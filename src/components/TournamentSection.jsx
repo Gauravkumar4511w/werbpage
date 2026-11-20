@@ -4,6 +4,7 @@ import freeFireMaxIcon from '../assets/hero-banner.jpg'
 import battleRoyalImage from '../assets/battelroyal.jpg'
 import clashSquadImage from '../assets/clashsquad.jpg'
 import loneWolfImage from '../assets/lone-wolf.jpg'
+import { formatStartsIn, getModeFamily, getModeFormat } from '../matchTheme.js'
 
 const matchGroups = MATCH_MODES.map((mode) => ({ name: mode, modes: [mode] }))
 
@@ -56,11 +57,23 @@ function formatTime(timestamp) {
   return new Date(timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })
 }
 
-function getModeFormat(mode) {
-  if (mode.includes('1v1')) return '1v1'
-  if (mode.includes('2v2')) return 'Duo'
-  if (mode.includes('4v4')) return 'Squad'
-  return mode.match(/(Solo|Duo|Squad|\d+v\d+)/i)?.[1] || mode
+// A small mark per mode family, drawn before the card title.
+function ModeGlyph({ family }) {
+  if (family === 'cs') {
+    return <svg className="match-card-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5 4 5.6v6.1c0 4.6 3.3 8.6 8 9.8 4.7-1.2 8-5.2 8-9.8V5.6L12 2.5Z" /><path d="m8.5 12.2 2.3 2.3 4.7-4.9" /></svg>
+  }
+  if (family === 'lw') {
+    return <svg className="match-card-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3.5 8.5 8h7L20 3.5V13l-8 7.5L4 13V3.5Z" /><path d="M9.2 12.3h.01M14.8 12.3h.01" /></svg>
+  }
+  return <svg className="match-card-glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.5" /><path d="M12 2v5M12 17v5M2 12h5M17 12h5" /><circle cx="12" cy="12" r="1.4" /></svg>
+}
+
+function TeamPips({ size }) {
+  return (
+    <span className="match-card-pips" aria-label={`${size} ${size === 1 ? 'player' : 'players'} per team`}>
+      {Array.from({ length: size }, (_, index) => <i key={index} />)}
+    </span>
+  )
 }
 
 function getModeImage(mode) {
@@ -125,7 +138,7 @@ function TournamentSection({ tournamentsOpen, onBack, joinedMatches, onJoinMatch
     if (!mode) return
     const expandTimer = window.setTimeout(() => setExpandedMode(mode), 0)
     const scrollTimer = window.setTimeout(() => {
-      const matchElement = Array.from(document.querySelectorAll('.scheduled-match')).find((element) => element.dataset.matchId === focusMatchId)
+      const matchElement = Array.from(document.querySelectorAll('.match-card')).find((element) => element.dataset.matchId === focusMatchId)
       matchElement?.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }, 80)
     return () => {
@@ -161,7 +174,7 @@ function TournamentSection({ tournamentsOpen, onBack, joinedMatches, onJoinMatch
             {matchGroups.filter((group) => !expandedMode || group.name === expandedMode).map((group) => (
               <section className={`tournament-day match-category${expandedMode === group.name ? ' is-expanded' : ''}`} key={`${day.date}-${group.name}`}>
                 <div
-                  className={`category-heading${group.name.startsWith('Battle Royale') ? ' mode-battle-royale' : ''}${group.name.startsWith('Clash Squad') ? ' mode-clash-squad' : ''}${group.name === 'Clash Squad 1v1' ? ' mode-one-v-one' : ''}${group.name === 'Lone Wolf 1v1' ? ' mode-lone-wolf' : ''}`}
+                  className={`category-heading theme-${getModeFamily(group.name).key}${group.name.startsWith('Battle Royale') ? ' mode-battle-royale' : ''}${group.name.startsWith('Clash Squad') ? ' mode-clash-squad' : ''}${group.name === 'Clash Squad 1v1' ? ' mode-one-v-one' : ''}${group.name === 'Lone Wolf 1v1' ? ' mode-lone-wolf' : ''}`}
                   style={{
                     backgroundImage: `url(${getModeImage(group.name)})`,
                     backgroundPosition: 'center',
@@ -181,6 +194,16 @@ function TournamentSection({ tournamentsOpen, onBack, joinedMatches, onJoinMatch
                   <span className="mode-format-label">
                     {getModeFormat(group.name)}
                   </span>
+                  {(() => {
+                    const modeMatches = day.matches.filter((match) => group.modes.includes(match.mode))
+                    const next = modeMatches.find((match) => match.matchTimestamp > currentTime)
+                    return (
+                      <span className={`mode-tile-info theme-${getModeFamily(group.name).key}`}>
+                        <strong>{group.name}</strong>
+                        <small>{next ? `Next ${formatTime(next.matchTimestamp)}` : 'Done for today'} · {modeMatches.length} {modeMatches.length === 1 ? 'match' : 'matches'}</small>
+                      </span>
+                    )
+                  })()}
                 </div>
                 {expandedMode === group.name && <div className="match-grid">
                   {day.matches.filter((match) => group.modes.includes(match.mode)).map((match) => {
@@ -199,46 +222,73 @@ function TournamentSection({ tournamentsOpen, onBack, joinedMatches, onJoinMatch
                 const isClosed = !isJoined && (hasEnded || hasStarted || isFull)
                 const buttonLabel = isJoined ? (canEdit ? 'Edit' : 'Joined') : hasEnded ? 'Ended' : hasStarted ? 'Closed' : isFull ? 'Full' : 'Join'
                 const details = { ...match, entryFee, joinedEntry, hasStarted, isFull }
+                const family = getModeFamily(match.mode)
+                const status = isJoined ? { tone: 'joined', label: 'Joined' }
+                  : hasEnded ? { tone: 'ended', label: 'Ended' }
+                  : hasStarted ? (currentTime < match.matchTimestamp + 3 * hour ? { tone: 'live', label: 'Live' } : { tone: 'ended', label: 'Closed' })
+                  : isFull ? { tone: 'full', label: 'Full' }
+                  : fillPercent >= 60 ? { tone: 'hot', label: 'Filling fast' }
+                  : { tone: 'open', label: 'Open' }
+                const startsIn = match.matchTimestamp - currentTime
+                const stats = [
+                  winning > 0 && { label: 'Win prize', value: winning.toLocaleString(), coin: true },
+                  perKill > 0 && { label: 'Per kill', value: perKill, coin: true },
+                ].filter(Boolean)
 
                 return (
                   <article
-                    className={`scheduled-match${isJoined ? ' is-joined-match' : ''}`}
+                    className={`match-card theme-${family.key} is-${status.tone}`}
                     key={match.id}
                     data-match-id={match.id}
                     onClick={() => onMatchDetails(details)}
-                    style={{ cursor: 'pointer' }}
                   >
-                    {isJoined && <span className="match-joined-light" aria-label="Match joined" />}
-                    <img className="match-game-mark" src={freeFireMaxIcon} alt="Free Fire MAX" />
-                    <div>
-                      <h4>{match.mode}</h4>
-                      <p>Free Fire MAX</p>
+                    <span className="match-card-watermark" aria-hidden="true">{getModeFormat(match.mode)}</span>
+                    <header className="match-card-top">
+                      <div className="match-card-tags">
+                        <span className="match-card-tag is-accent">{getModeFormat(match.mode)}</span>
+                        <span className="match-card-tag">{family.tag}</span>
+                      </div>
+                      <span className={`match-card-status is-${status.tone}`}>{status.label}</span>
+                    </header>
+                    <h4><ModeGlyph family={family.key} />{match.mode}</h4>
+                    <p className="match-card-sub">Free Fire MAX{match.publicId && <> · <b>{match.publicId}</b></>}</p>
+                    <div className="match-card-fill">
+                      <span className="match-card-bar"><i style={{ width: `${fillPercent}%` }} /></span>
+                      <span className="match-card-count"><b>{joinedCount}</b>/{matchCapacity.total} {matchCapacity.unit}</span>
                     </div>
-                    <div className="match-meta">
-                      <time>{formatTime(match.matchTimestamp)}</time>
-                      <span className="match-entry-fee"><span className="coin-icon" aria-hidden="true"></span>{entryFee} coins</span>
-                      {winning > 0 && <span className="match-win-coins">{winning.toLocaleString()} winning coins</span>}
-                      {perKill > 0 && <span className="match-win-coins">{perKill} {perKill === 1 ? 'coin' : 'coins'} per kill</span>}
-                      <span className={`match-capacity-badge${matchCapacity.unit === 'players' ? ' is-player-count' : ''}`} style={{ '--capacity-fill': `${fillPercent}%` }}>
-                        <span>{joinedCount}/{matchCapacity.total} {matchCapacity.unit}</span>
-                      </span>
-                    </div>
-                    <div className="match-action">
-                      <span className="match-public-id">{match.publicId}</span>
-                      {/* Never disabled for low coins: tapping Join then explains how many coins are missing. */}
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          if (isJoined && !canEdit) onMatchDetails(details)
-                          else onJoinMatch(details)
-                        }}
-                        disabled={isClosed}
-                        className={isJoined ? 'joined-button' : ''}
-                      >
-                        {buttonLabel}
-                      </button>
-                    </div>
+                    <dl className="match-card-stats">
+                      <div>
+                        <dt>Time</dt>
+                        <dd>{formatTime(match.matchTimestamp)}</dd>
+                        <small>{hasEnded ? 'Result out' : hasStarted ? 'Started' : formatStartsIn(startsIn)}</small>
+                      </div>
+                      {stats.map((stat) => (
+                        <div key={stat.label}>
+                          <dt>{stat.label}</dt>
+                          <dd>{stat.coin && <span className="coin-icon" aria-hidden="true"></span>}{stat.value}</dd>
+                          <small>coins</small>
+                        </div>
+                      ))}
+                      <div>
+                        <dt>Team</dt>
+                        <dd><TeamPips size={matchCapacity.teamSize} /></dd>
+                        <small>{matchCapacity.teamSize === 1 ? 'Solo' : `${matchCapacity.teamSize} players`}</small>
+                      </div>
+                    </dl>
+                    {/* Never disabled for low coins: tapping Join then explains how many coins are missing. */}
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        if (isJoined && !canEdit) onMatchDetails(details)
+                        else onJoinMatch(details)
+                      }}
+                      disabled={isClosed}
+                      className={`match-card-join${isJoined ? ' joined-button' : ''}`}
+                    >
+                      {!isJoined && !isClosed && <><span className="match-card-coin" aria-hidden="true"></span><span className="match-card-fee">{entryFee}</span></>}
+                      <span>{buttonLabel === 'Join' ? 'Join now' : buttonLabel}</span>
+                    </button>
                   </article>
                   )})}
                 </div>}

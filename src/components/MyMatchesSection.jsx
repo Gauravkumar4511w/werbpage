@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { EDIT_LOCK_MS } from '../../lib/match-schedule.js'
 import { formatWhen, matchState } from '../myMatches.js'
+import { getModeFamily, getModeFormat } from '../matchTheme.js'
 
 function CopyValue({ label, value }) {
   const [copied, setCopied] = useState(false)
@@ -42,9 +43,13 @@ function MyMatchesSection({ joinedMatches, currentTime, onBack, onBrowseMatches,
             const canEdit = start && currentTime < start - EDIT_LOCK_MS
             const players = (match.identifiers?.length ? match.identifiers : [match.identifier]).filter(Boolean)
             return (
-              <article className={`my-match-card is-${state.tone}`} key={match.id}>
+              <article className={`my-match-card is-${state.tone} theme-${getModeFamily(match.mode).key}`} key={match.id}>
                 <header>
                   <div>
+                    <div className="match-card-tags">
+                      {match.mode && <span className="match-card-tag is-accent">{getModeFormat(match.mode)}</span>}
+                      <span className="match-card-tag">{match.mode ? getModeFamily(match.mode).tag : 'Free Fire'}</span>
+                    </div>
                     <p>{match.publicId || 'Match'} · Free Fire MAX</p>
                     <h3>{match.mode || 'Joined match'}</h3>
                   </div>
