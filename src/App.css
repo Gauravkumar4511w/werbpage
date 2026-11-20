@@ -1244,3 +1244,13 @@ body { background: #07111c; }
   .match-card-watermark { font-size: 70px; }
 }
 @media (prefers-reduced-motion: reduce) { .match-card, .category-heading, .match-card-join { transition: none; }.match-card:hover, .category-heading:hover { transform: none; } }
+
+/* Discover: only the two buttons and the player count, at the bottom so the artwork stays clear. */
+.nav-showcase { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 18px; padding-bottom: clamp(36px, 7vh, 72px); }
+.nav-showcase .showcase-actions { flex-wrap: wrap; justify-content: center; margin-top: 0; }
+.nav-showcase .status-bar { position: static; display: inline-flex; align-items: center; }
+
+/* An open mode shows only its cards, so it no longer needs the banner's height. */
+.match-category.is-expanded { min-height: 0; align-content: start; }
+.tournament-date-group.is-detail-view { align-content: start; }
+.match-category.is-expanded .match-grid { align-items: start; padding-top: 4px; }
