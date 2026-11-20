@@ -2,13 +2,13 @@ import { useInstallPrompt } from '../installPrompt.js'
 
 // Icons for the phone dock, drawn with one stroke so they take the tab's colour.
 const dockIcons = {
-  discover: <><circle cx="12" cy="12" r="9" /><path d="m15.5 8.5-2 5-5 2 2-5 5-2Z" /></>,
+  profile: <><circle cx="12" cy="8.5" r="4" /><path d="M4.5 20c.9-3.9 3.9-6 7.5-6s6.6 2.1 7.5 6" /></>,
   history: <><path d="M3.5 12a8.5 8.5 0 1 0 2.5-6" /><path d="M3.5 4.5V9H8" /><path d="M12 7.5V12l3 2" /></>,
   matches: <><circle cx="12" cy="12" r="7" /><circle cx="12" cy="12" r="2.5" /><path d="M12 2v4M12 18v4M2 12h4M18 12h4" /></>,
   mine: <><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h11A2.5 2.5 0 0 1 20 7.5v2a2.5 2.5 0 0 0 0 5v2a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5v-2a2.5 2.5 0 0 0 0-5v-2Z" /><path d="M10 9.5h4M10 14.5h4" /></>,
 }
 
-function Navbar({ menuOpen, setMenuOpen, player, setAuthOpen, onHome, onHistory, libraryOpen, tournamentsOpen, myMatchesOpen, onMyMatches, upcomingMatchCount, onTournaments, onCoinClick, coinBalance, onAdmin, playerLevel = 1 }) {
+function Navbar({ menuOpen, setMenuOpen, player, setAuthOpen, accountOpen = false, onHome, onHistory, libraryOpen, tournamentsOpen, myMatchesOpen, onMyMatches, upcomingMatchCount, onTournaments, onCoinClick, coinBalance, onAdmin, playerLevel = 1 }) {
   const closeMenu = () => setMenuOpen(false)
   const openWallet = () => { closeMenu(); onCoinClick() }
   const openAccount = () => { closeMenu(); setAuthOpen(true) }
@@ -16,12 +16,13 @@ function Navbar({ menuOpen, setMenuOpen, player, setAuthOpen, onHome, onHistory,
   const { canInstall, install } = useInstallPrompt()
   const installApp = () => { closeMenu(); install() }
   const dockTabs = [
-    { key: 'discover', label: 'Discover', href: '#discover', onClick: onHome, active: !libraryOpen && !tournamentsOpen && !myMatchesOpen },
-    { key: 'history', label: 'History', href: '#library', onClick: onHistory, active: libraryOpen },
-    { key: 'matches', label: 'Matches', href: '#tournaments', onClick: onTournaments, active: tournamentsOpen },
-    { key: 'mine', label: 'My Matches', href: '#my-matches', onClick: onMyMatches, active: myMatchesOpen, badge: upcomingMatchCount },
+    { key: 'profile', label: 'Profile', href: '#profile', onClick: (event) => { event.preventDefault(); openAccount() }, active: accountOpen },
+    { key: 'history', label: 'History', href: '#library', onClick: onHistory, active: !accountOpen && libraryOpen },
+    { key: 'matches', label: 'Matches', href: '#tournaments', onClick: onTournaments, active: !accountOpen && tournamentsOpen },
+    { key: 'mine', label: 'My Matches', href: '#my-matches', onClick: onMyMatches, active: !accountOpen && myMatchesOpen, badge: upcomingMatchCount },
   ]
-  const activeTab = Math.max(0, dockTabs.findIndex((tab) => tab.active))
+  // On Discover no tab is open, so the pill hides until one is.
+  const activeTab = dockTabs.findIndex((tab) => tab.active)
 
   return (
     <>
@@ -36,6 +37,11 @@ function Navbar({ menuOpen, setMenuOpen, player, setAuthOpen, onHome, onHistory,
         <button className="coin-balance" type="button" aria-label="Open coin wallet" onClick={openWallet}>
           <span className="coin-icon" aria-hidden="true"></span><strong>{coinBalance.toLocaleString()}</strong><small>COINS</small>
         </button>
+        {canInstall && (
+          <button className="quick-install" type="button" aria-label="Install app" onClick={installApp}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14" /></svg>
+          </button>
+        )}
         <button className="quick-avatar" type="button" aria-label="Open account" onClick={openAccount}>
           <span className="avatar">{initials}</span>
         </button>
@@ -80,7 +86,7 @@ function Navbar({ menuOpen, setMenuOpen, player, setAuthOpen, onHome, onHistory,
 
     {/* Phones get the four main pages in a dock at the bottom, in thumb reach. It sits outside the
         top bar, whose backdrop blur would otherwise pin it to the bar. */}
-    <nav className="phone-dock" aria-label="Quick navigation" style={{ '--dock-index': activeTab }}>
+    <nav className={`phone-dock${activeTab < 0 ? ' is-idle' : ''}`} aria-label="Quick navigation" style={{ '--dock-index': Math.max(0, activeTab) }}>
       <span className="phone-dock-glow" aria-hidden="true" />
       {dockTabs.map((tab) => (
         <a
