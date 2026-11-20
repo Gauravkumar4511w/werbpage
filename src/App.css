@@ -1359,3 +1359,22 @@ body { background: #07111c; }
   .phone-dock, .phone-dock-glow::after, .phone-dock-tab.is-active .phone-dock-icon, .phone-dock-badge, .brand-mark i, .nav-content.is-open, .nav-content.is-open .nav-actions > *, .nav-scrim { animation: none; }
   .phone-dock-glow, .menu-toggle span:not(.sr-only) { transition: none; }
 }
+
+/* Matches: the Free Fire India artwork stays behind the whole page, an open mode included. It sits
+   on a fixed layer (not background-attachment: fixed, which phones ignore), so it neither scrolls
+   nor stretches with a long list. */
+.tournament-section, .tournament-section.has-expanded-mode { isolation: isolate; background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.tournament-section::after { position: fixed; z-index: -1; inset: 0; background: linear-gradient(180deg, rgba(5,11,19,.74), rgba(5,11,19,.9)), url('./assets/freefire-india.jpg') center / cover no-repeat; content: ''; pointer-events: none; }
+
+/* Phones: no menu button. The dock holds the pages and Profile, the bar keeps coins and the avatar,
+   and Admin is a desktop-only option. */
+.quick-install { display: none; }
+@media (max-width: 760px) {
+  .menu-toggle, .nav-content, .nav-scrim { display: none !important; }
+  .admin-link:not(.install-app) { display: none; }
+  .nav-quick { gap: 10px; }
+  .quick-install { display: grid; width: 34px; height: 34px; place-items: center; padding: 0; border: 1px solid rgba(255,194,71,.35); border-radius: 12px; color: #ffc247; background: rgba(255,194,71,.08); cursor: pointer; }
+  .quick-install svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .phone-dock.is-idle .phone-dock-glow { opacity: 0; transform: translateX(0) scale(.6); }
+  .phone-dock-glow { transition: transform .45s cubic-bezier(.3, 1.35, .45, 1), opacity .25s ease; }
+}

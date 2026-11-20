@@ -150,9 +150,6 @@ function TournamentSection({ tournamentsOpen, onBack, joinedMatches, onJoinMatch
   return (
     <section
       className={`tournament-section${tournamentsOpen ? ' is-visible' : ''}${expandedMode ? ' has-expanded-mode' : ''}`}
-      style={expandedMode ? {
-        backgroundImage: `linear-gradient(rgba(7,16,27,.68), rgba(7,16,27,.84)), url(${getModeImage(expandedMode)})`,
-      } : undefined}
       aria-labelledby="tournament-title"
     >
       <button className="library-back" type="button" onClick={onBack}>&lt;- Back to discover</button>

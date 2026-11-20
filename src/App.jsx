@@ -903,6 +903,7 @@ function App() {
           setAuthOpen(open);
         }}
         onHome={openHome}
+        accountOpen={authOpen}
         onHistory={(event) => {
           event.preventDefault();
           if (!requireLogin()) return;
