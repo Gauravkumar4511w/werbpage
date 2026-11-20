@@ -10,7 +10,7 @@ import { countUpcomingMatches } from "./myMatches.js";
 import Navbar from "./components/Navbar";
 import TournamentSection from "./components/TournamentSection";
 import WalletModal from "./components/WalletModal";
-import { EDIT_LOCK_MS, formatMatchNo, getPerKillCoins, getTeamSize, getWinningCoins } from "../lib/match-schedule.js";
+import { EDIT_LOCK_MS, formatMatchNo, getEntryCost, getPerKillCoins, getTeamSize, getWinningCoins } from "../lib/match-schedule.js";
 import { imageFileToDataUrl } from "./imageUpload.js";
 
 const userDataStorageKey = "nexus-user-data";
@@ -83,6 +83,7 @@ function joinedMatchesFromServer(entries, previous) {
       mode: entry.mode || local?.mode || "",
       matchTimestamp: Number(entry.matchTimestamp) || local?.matchTimestamp || 0,
       entryFee: Number(entry.entryFee) || local?.entryFee || 0,
+      freeEntry: entry.freeEntry === undefined ? Boolean(local?.freeEntry) : Boolean(entry.freeEntry),
       status: entry.status,
       won: Boolean(entry.won),
       teamNo: Number(entry.teamNo) || local?.teamNo || null,
@@ -376,6 +377,8 @@ function App() {
     const matchId = String(match.id).toLowerCase();
     const existingMatch = joinedMatches.find((entry) => entry.id === matchId);
     const matchStartTime = Number(match.matchTimestamp || existingMatch?.matchTimestamp || 0);
+    // Nothing for a free launch-offer match, otherwise its entry fee.
+    const joinCost = getEntryCost(match);
 
     if (existingMatch) {
       if (matchStartTime && Date.now() >= matchStartTime - EDIT_LOCK_MS) {
@@ -388,8 +391,8 @@ function App() {
     } else if (match.isFull) {
       showNotice("This match is full. Pick another match.", "error");
       return;
-    } else if (coins < match.entryFee) {
-      openWalletForTopUp(match.entryFee - coins, match.mode);
+    } else if (coins < joinCost) {
+      openWalletForTopUp(joinCost - coins, match.mode);
       return;
     }
 
@@ -399,7 +402,7 @@ function App() {
     setJoinConfirm({
       matchId,
       mode: match.mode,
-      cost: match.entryFee,
+      cost: joinCost,
       playerCount,
       identifiers: Array.from({ length: playerCount }, (_, index) => savedIdentifiers[index] || (index === 0 ? player?.name?.trim() || "" : "")),
       error: "",
@@ -1096,7 +1099,7 @@ function App() {
               <div className="match-detail-grid">
                 <div>
                   <span>Entry</span>
-                  <strong>{Number(matchDetails.entryFee || 0).toLocaleString()} coins</strong>
+                  <strong>{getEntryCost(matchDetails) > 0 ? `${getEntryCost(matchDetails).toLocaleString()} coins` : "Free"}</strong>
                 </div>
                 {detailsWinning > 0 && (
                   <div className="match-detail-win">
@@ -1217,7 +1220,9 @@ function App() {
             <p className="join-confirm-text">
               {joinConfirm.isEditing
                 ? "Update your team's in-game names. No extra coins are charged."
-                : <>This match will use <strong>{joinConfirm.cost.toLocaleString()} coins</strong> from your wallet ({visibleCoins.toLocaleString()} available).</>}
+                : joinConfirm.cost > 0
+                  ? <>This match will use <strong>{joinConfirm.cost.toLocaleString()} coins</strong> from your wallet ({visibleCoins.toLocaleString()} available).</>
+                  : <>This match is <strong>free to join</strong>. No coins are taken from your wallet.</>}
             </p>
             <form
               onSubmit={(event) => {

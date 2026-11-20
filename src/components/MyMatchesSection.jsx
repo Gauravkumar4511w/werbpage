@@ -58,7 +58,7 @@ function MyMatchesSection({ joinedMatches, currentTime, onBack, onBrowseMatches,
                 <dl>
                   <div><dt>When</dt><dd>{formatWhen(start)}</dd></div>
                   {match.teamNo && <div><dt>Team no.</dt><dd>#{match.teamNo}</dd></div>}
-                  {match.entryFee > 0 && <div><dt>Entry</dt><dd>{Number(match.entryFee).toLocaleString()} coins</dd></div>}
+                  {match.freeEntry ? <div><dt>Entry</dt><dd>Free</dd></div> : match.entryFee > 0 && <div><dt>Entry</dt><dd>{Number(match.entryFee).toLocaleString()} coins</dd></div>}
                   <div className="my-match-players"><dt>{players.length > 1 ? 'Your team' : 'Player'}</dt><dd>{players.join(', ') || 'Confirmed'}</dd></div>
                 </dl>
                 {match.roomId ? (
