@@ -14,6 +14,7 @@ process.env.ADMIN_SESSION_SECRET = 'test-only-session-secret'
 const { default: handle } = await import('../server.js')
 const db = await import('../lib/payout-db.js')
 const { getScheduledMatches, getEntryCost } = await import('../lib/match-schedule.js')
+const { createClient } = await import('@libsql/client')
 after(() => fs.rmSync(directory, { recursive: true, force: true }))
 
 async function request(url, { method = 'POST', body, headers = {}, query } = {}) {
@@ -45,9 +46,9 @@ const scheduled = (now, mode, round) => getScheduledMatches(now).filter((match) 
 const walletOf = (player) => db.getAuthorizedWallet(player, offerDay)
 const catalogMatch = async (match) => (await db.getPublicMatchCatalog(offerDay)).find((item) => item.match_id === match.id.toLowerCase())
 
-test('from 21 Nov to 4 Dec only each Battle Royale mode\'s first daily match is free', () => {
+test('from 20 Nov to 4 Dec only each Battle Royale mode\'s first daily match is free', () => {
   const india = (day) => Date.UTC(2026, 10, day, 1, 30)
-  for (const now of [india(21), offerDay, Date.UTC(2026, 11, 4, 1, 30)]) {
+  for (const now of [india(20), offerDay, Date.UTC(2026, 11, 4, 1, 30)]) {
     const matches = getScheduledMatches(now)
     assert.equal(matches.filter((match) => match.freeEntry).length, 3)
     for (const mode of new Set(matches.map((match) => match.mode))) {
@@ -55,7 +56,7 @@ test('from 21 Nov to 4 Dec only each Battle Royale mode\'s first daily match is 
       assert.equal(scheduled(now, mode, 1).freeEntry, false)
     }
   }
-  for (const now of [india(20), Date.UTC(2026, 11, 5, 1, 30)]) {
+  for (const now of [india(19), Date.UTC(2026, 11, 5, 1, 30)]) {
     assert.ok(getScheduledMatches(now).every((match) => !match.freeEntry))
   }
   assert.equal(getEntryCost({ entryFee: 25, freeEntry: true }), 0)
@@ -118,4 +119,21 @@ test('the admin overview marks free matches', async () => {
   const free = scheduled(offerDay, 'Battle Royale Duo', 0)
   const overview = await db.getAdminOverview()
   assert.equal(overview.matches.find((match) => match.match_id === free.id.toLowerCase()).free_entry, 1)
+})
+
+test('a day made before the offer reached it turns free, unless someone already paid to join', async () => {
+  const day = Date.UTC(2026, 10, 26, 1, 30)
+  const solo = scheduled(day, 'Battle Royale Solo', 0)
+  const duo = scheduled(day, 'Battle Royale Duo', 0)
+  await db.getPublicMatchCatalog(day)
+  // Store both as paid, the way the day's matches were made before the offer started.
+  const raw = createClient({ url: `file:${path.join(directory, 'arenacore.sqlite')}` })
+  await raw.execute({ sql: 'UPDATE matches SET free_entry = 0 WHERE match_id IN (?, ?)', args: [solo.id.toLowerCase(), duo.id.toLowerCase()] })
+  // Someone joined the Duo match, and paid, before this update was deployed.
+  await raw.execute({ sql: "INSERT INTO match_entries (match_id, team_key, user_key, identifiers, team_no) VALUES (?, ?, ?, '[]', 1)", args: [duo.id.toLowerCase(), players[0].userKey, players[0].userKey] })
+
+  const catalog = await db.getPublicMatchCatalog(day)
+  assert.equal(catalog.find((item) => item.match_id === solo.id.toLowerCase()).free_entry, 1)
+  assert.equal(catalog.find((item) => item.match_id === duo.id.toLowerCase()).free_entry, 0)
+  raw.close()
 })
