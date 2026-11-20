@@ -219,13 +219,15 @@ function TournamentSection({ tournamentsOpen, onBack, joinedMatches, onJoinMatch
                 const isFull = !isJoined && joinedCount >= matchCapacity.total
                 const canEdit = isJoined && !hasEnded && currentTime < match.matchTimestamp - EDIT_LOCK_MS
                 const isClosed = !isJoined && (hasEnded || hasStarted || isFull)
-                const buttonLabel = isJoined ? (canEdit ? 'Edit' : 'Joined') : hasEnded ? 'Ended' : hasStarted ? 'Closed' : isFull ? 'Full' : 'Join'
+                // A started match reads Live for its first 3 hours, then Played once its time is over.
+                const isLive = hasStarted && !hasEnded && currentTime < match.matchTimestamp + 3 * hour
+                const buttonLabel = isJoined ? (canEdit ? 'Edit' : 'Joined') : isLive ? 'Live' : hasEnded || hasStarted ? 'Played' : isFull ? 'Full' : 'Join'
                 const cost = getEntryCost({ entryFee, freeEntry: match.freeEntry })
                 const details = { ...match, entryFee, cost, joinedEntry, hasStarted, isFull }
                 const family = getModeFamily(match.mode)
                 const status = isJoined ? { tone: 'joined', label: 'Joined' }
-                  : hasEnded ? { tone: 'ended', label: 'Ended' }
-                  : hasStarted ? (currentTime < match.matchTimestamp + 3 * hour ? { tone: 'live', label: 'Live' } : { tone: 'ended', label: 'Closed' })
+                  : isLive ? { tone: 'live', label: 'Live' }
+                  : hasEnded || hasStarted ? { tone: 'ended', label: 'Played' }
                   : isFull ? { tone: 'full', label: 'Full' }
                   : fillPercent >= 60 ? { tone: 'hot', label: 'Filling fast' }
                   : { tone: 'open', label: 'Open' }
@@ -261,7 +263,7 @@ function TournamentSection({ tournamentsOpen, onBack, joinedMatches, onJoinMatch
                       <div>
                         <dt>Time</dt>
                         <dd>{formatTime(match.matchTimestamp)}</dd>
-                        <small>{hasEnded ? 'Result out' : hasStarted ? 'Started' : formatStartsIn(startsIn)}</small>
+                        <small>{hasEnded ? 'Result out' : isLive ? 'Live now' : hasStarted ? 'Played' : formatStartsIn(startsIn)}</small>
                       </div>
                       {stats.map((stat) => (
                         <div key={stat.label}>
