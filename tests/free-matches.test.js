@@ -45,13 +45,13 @@ const scheduled = (now, mode, round) => getScheduledMatches(now).filter((match) 
 const walletOf = (player) => db.getAuthorizedWallet(player, offerDay)
 const catalogMatch = async (match) => (await db.getPublicMatchCatalog(offerDay)).find((item) => item.match_id === match.id.toLowerCase())
 
-test('from 21 Nov to 4 Dec each mode\'s first daily match is free, and only that one', () => {
+test('from 21 Nov to 4 Dec only each Battle Royale mode\'s first daily match is free', () => {
   const india = (day) => Date.UTC(2026, 10, day, 1, 30)
   for (const now of [india(21), offerDay, Date.UTC(2026, 11, 4, 1, 30)]) {
     const matches = getScheduledMatches(now)
-    assert.equal(matches.filter((match) => match.freeEntry).length, 7)
+    assert.equal(matches.filter((match) => match.freeEntry).length, 3)
     for (const mode of new Set(matches.map((match) => match.mode))) {
-      assert.equal(scheduled(now, mode, 0).freeEntry, true)
+      assert.equal(scheduled(now, mode, 0).freeEntry, mode.startsWith('Battle Royale'), mode)
       assert.equal(scheduled(now, mode, 1).freeEntry, false)
     }
   }
@@ -81,26 +81,34 @@ test('joining a free match takes no coins, while the same mode\'s paid match sti
   assert.equal((await catalogMatch(paid)).free_entry, 0)
 })
 
-test('a free match still pays its winner the normal prize, and shows nothing collected', async () => {
-  const duel = scheduled(offerDay, 'Clash Squad 1v1', 0)
+test('a free match still pays the normal kill coins, and shows nothing collected', async () => {
+  const solo = scheduled(offerDay, 'Battle Royale Solo', 0)
   for (const [index, player] of players.entries()) {
-    await db.recordMatchEntry({ ...player, matchId: duel.id, identifiers: [`Duel${index}x`] }, offerDay)
+    await db.recordMatchEntry({ ...player, matchId: solo.id, identifiers: [`Solo${index}x`] }, offerDay)
   }
   const winningBefore = (await walletOf(players[1])).winningCoins
-  const result = await request('/api/admin/matches/confirm-result', { headers: admin, body: { matchId: duel.id.toLowerCase(), winnerTeamKey: players[1].userKey } })
+  // 3 kills at the normal 4 coins a kill for a 10 coin Solo, paid by the house.
+  const kills = await request('/api/admin/matches/kills', { headers: admin, body: { matchId: solo.id.toLowerCase(), kills: [{ userKey: players[1].userKey, kills: 3 }] } })
+  assert.equal(kills.status, 200, JSON.stringify(kills.data))
+  assert.equal((await walletOf(players[1])).winningCoins, winningBefore + 12)
+
+  const result = await request('/api/admin/matches/confirm-result', { headers: admin, body: { matchId: solo.id.toLowerCase(), winnerTeamKey: players[1].userKey } })
   assert.equal(result.status, 200, JSON.stringify(result.data))
-  // 10 coins x 2 players x 80%, paid by the house.
-  assert.equal(result.data.payout.payoutPool, 16)
   assert.equal(result.data.payout.totalPool, 0)
-  assert.equal(result.data.payout.platformMargin, -16)
-  assert.equal((await walletOf(players[1])).winningCoins, winningBefore + 16)
+})
+
+test('Clash Squad and Lone Wolf stay paid during the offer', async () => {
+  const duel = scheduled(offerDay, 'Clash Squad 1v1', 0)
+  const joined = await db.recordMatchEntry({ ...players[1], matchId: duel.id, identifiers: ['PaidDuel1'] }, offerDay)
+  assert.equal(joined.charged, 10)
+  assert.equal((await catalogMatch(duel)).free_entry, 0)
 })
 
 test('deleting a free match after people joined refunds nothing', async () => {
-  const wolf = scheduled(offerDay, 'Lone Wolf 1v1', 0)
-  await db.recordMatchEntry({ ...players[1], matchId: wolf.id, identifiers: ['LoneWolfX'] }, offerDay)
+  const squad = scheduled(offerDay, 'Battle Royale Squad', 0)
+  await db.recordMatchEntry({ ...players[1], matchId: squad.id, identifiers: ['Sq1aa', 'Sq2bb', 'Sq3cc', 'Sq4dd'] }, offerDay)
   const before = (await walletOf(players[1])).totalCoins
-  const deleted = await request('/api/admin/matches/delete', { method: 'DELETE', headers: admin, body: { matchId: (await catalogMatch(wolf)).public_id } })
+  const deleted = await request('/api/admin/matches/delete', { method: 'DELETE', headers: admin, body: { matchId: (await catalogMatch(squad)).public_id } })
   assert.equal(deleted.status, 200, JSON.stringify(deleted.data))
   assert.equal((await walletOf(players[1])).totalCoins, before)
 })
