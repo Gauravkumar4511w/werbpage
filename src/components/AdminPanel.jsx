@@ -605,6 +605,8 @@ function AdminPanel({ onBack }) {
         time: formatTime(match.match_timestamp),
         joined: `${joinedTeams(match.match_id)}/${getMatchCapacity(match.mode).total}`,
         state: matchStateLabels[stateOf(match)],
+        // A free launch-offer match costs nothing to join; its fee still sets the prize.
+        entry_fee: Number(match.free_entry) === 1 ? `Free (prize as ${match.entry_fee})` : match.entry_fee,
         room: match.room_id ? 'Set' : '-',
         winner: match.winner_team_key ? `${winnerNo ? `#${winnerNo} · ` : ''}${match.winner_team_key}` : '-',
       }

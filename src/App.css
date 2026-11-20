@@ -1390,3 +1390,7 @@ body { background: #07111c; }
 @keyframes gate-brand-in { from { opacity: 0; transform: translate(-50%, -10px); } to { opacity: 1; transform: translate(-50%, 0); } }
 @keyframes gate-card-in { from { opacity: 0; transform: translateY(18px) scale(.98); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .login-gate-brand, .auth-backdrop.is-required .auth-modal { animation: none; } }
+
+/* Free launch-offer matches: a green tag on the card and FREE on the join button. */
+.match-card-tag.is-free { color: #7ff0b0; background: rgba(94,227,154,.14); box-shadow: inset 0 0 0 1px rgba(94,227,154,.45); }
+.match-card-free { padding: 3px 8px; border-radius: 999px; color: #0b2a18; background: #7ff0b0; font-family: var(--mono); font-size: 12px; font-weight: 800; letter-spacing: .08em; text-shadow: none; }

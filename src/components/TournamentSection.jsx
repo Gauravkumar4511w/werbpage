@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { DEFAULT_ENTRY_FEES, EDIT_LOCK_MS, MATCH_MODES, formatMatchNo, getMatchCapacity, getPerKillCoins, getScheduledMatches, getWinningCoins } from '../../lib/match-schedule.js'
+import { DEFAULT_ENTRY_FEES, EDIT_LOCK_MS, MATCH_MODES, getEntryCost, formatMatchNo, getMatchCapacity, getPerKillCoins, getScheduledMatches, getWinningCoins } from '../../lib/match-schedule.js'
 import freeFireMaxIcon from '../assets/hero-banner.jpg'
 import battleRoyalImage from '../assets/battelroyal.jpg'
 import clashSquadImage from '../assets/clashsquad.jpg'
@@ -20,6 +20,7 @@ function fromCatalog(match) {
     mode: match.mode,
     description: match.description || '',
     entryFee: Number(match.entry_fee) || DEFAULT_ENTRY_FEES[match.mode],
+    freeEntry: Number(match.free_entry) === 1,
     matchTimestamp: Number(match.match_timestamp) || 0,
     prizePool: match.prize_pool,
     perKill: match.per_kill,
@@ -219,7 +220,8 @@ function TournamentSection({ tournamentsOpen, onBack, joinedMatches, onJoinMatch
                 const canEdit = isJoined && !hasEnded && currentTime < match.matchTimestamp - EDIT_LOCK_MS
                 const isClosed = !isJoined && (hasEnded || hasStarted || isFull)
                 const buttonLabel = isJoined ? (canEdit ? 'Edit' : 'Joined') : hasEnded ? 'Ended' : hasStarted ? 'Closed' : isFull ? 'Full' : 'Join'
-                const details = { ...match, entryFee, joinedEntry, hasStarted, isFull }
+                const cost = getEntryCost({ entryFee, freeEntry: match.freeEntry })
+                const details = { ...match, entryFee, cost, joinedEntry, hasStarted, isFull }
                 const family = getModeFamily(match.mode)
                 const status = isJoined ? { tone: 'joined', label: 'Joined' }
                   : hasEnded ? { tone: 'ended', label: 'Ended' }
@@ -245,6 +247,7 @@ function TournamentSection({ tournamentsOpen, onBack, joinedMatches, onJoinMatch
                       <div className="match-card-tags">
                         <span className="match-card-tag is-accent">{getModeFormat(match.mode)}</span>
                         <span className="match-card-tag">{family.tag}</span>
+                        {match.freeEntry && <span className="match-card-tag is-free">Free entry</span>}
                       </div>
                       <span className={`match-card-status is-${status.tone}`}>{status.label}</span>
                     </header>
@@ -284,8 +287,10 @@ function TournamentSection({ tournamentsOpen, onBack, joinedMatches, onJoinMatch
                       disabled={isClosed}
                       className={`match-card-join${isJoined ? ' joined-button' : ''}`}
                     >
-                      {!isJoined && !isClosed && <><span className="match-card-coin" aria-hidden="true"></span><span className="match-card-fee">{entryFee}</span></>}
-                      <span>{buttonLabel === 'Join' ? 'Join now' : buttonLabel}</span>
+                      {!isJoined && !isClosed && (cost > 0
+                        ? <><span className="match-card-coin" aria-hidden="true"></span><span className="match-card-fee">{cost}</span></>
+                        : <span className="match-card-free">FREE</span>)}
+                      <span>{buttonLabel === 'Join' ? (cost > 0 ? 'Join now' : 'Join free') : buttonLabel}</span>
                     </button>
                   </article>
                   )})}
