@@ -6,6 +6,7 @@ import AdminPanel from "./components/AdminPanel";
 import HeroSection from "./components/HeroSection";
 import LibrarySection from "./components/LibrarySection";
 import MyMatchesSection from "./components/MyMatchesSection";
+import InstallAppButton from "./components/InstallAppButton";
 import { countUpcomingMatches } from "./myMatches.js";
 import Navbar from "./components/Navbar";
 import TournamentSection from "./components/TournamentSection";
@@ -897,6 +898,7 @@ function App() {
   const authModal = (
     <AuthModal
       required={loginRequired}
+      footer={loginRequired ? <InstallAppButton className="is-login" /> : null}
       authOpen={loginRequired || authOpen}
       setAuthOpen={setAuthOpen}
       authMode={authMode}
