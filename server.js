@@ -38,7 +38,10 @@ import {
   reviewPaymentRequest,
   reviewWithdrawalRequest,
   getUpload,
+  savePushSubscription,
+  removePushSubscription,
 } from './lib/payout-db.js'
+import { getPushPublicKey } from './lib/push.js'
 
 try { process.loadEnvFile?.() } catch { /* Deployed environments may not have a local .env file. */ }
 
@@ -410,6 +413,30 @@ async function handleApiRequest(request, response) {
       sendJson(response, 200, await reviewWithdrawalRequest(await readBody(request)))
     } catch (error) {
       sendError(response, error, 'Could not review the withdrawal.')
+    }
+    return
+  }
+
+  // Phone notifications: the browser needs the public key to subscribe, then saves its subscription.
+  if (request.method === 'GET' && pathname === '/api/push/public-key') {
+    sendJson(response, 200, { publicKey: getPushPublicKey() })
+    return
+  }
+
+  if (request.method === 'POST' && pathname === '/api/push/subscribe') {
+    try {
+      sendJson(response, 201, await savePushSubscription(await readBody(request)))
+    } catch (error) {
+      sendError(response, error, 'Could not turn on notifications.')
+    }
+    return
+  }
+
+  if (request.method === 'POST' && pathname === '/api/push/unsubscribe') {
+    try {
+      sendJson(response, 200, await removePushSubscription(await readBody(request)))
+    } catch (error) {
+      sendError(response, error, 'Could not turn off notifications.')
     }
     return
   }
