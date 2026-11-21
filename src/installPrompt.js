@@ -18,6 +18,18 @@ if (typeof window !== 'undefined') {
   })
 }
 
+// Opens Chrome's install dialog. It lives outside the hook on purpose: inside it, the React
+// Compiler turned `const prompt = deferredPrompt` into reads of deferredPrompt after it was set to
+// null, so every tap failed with "Cannot read properties of null (reading 'prompt')".
+async function openInstallDialog() {
+  const prompt = deferredPrompt
+  if (!prompt) return
+  deferredPrompt = null
+  notify()
+  await prompt.prompt()
+  await prompt.userChoice
+}
+
 export function useInstallPrompt() {
   const [canInstall, setCanInstall] = useState(Boolean(deferredPrompt))
 
@@ -26,14 +38,5 @@ export function useInstallPrompt() {
     return () => listeners.delete(setCanInstall)
   }, [])
 
-  const install = async () => {
-    if (!deferredPrompt) return
-    const prompt = deferredPrompt
-    deferredPrompt = null
-    notify()
-    await prompt.prompt()
-    await prompt.userChoice
-  }
-
-  return { canInstall, install }
+  return { canInstall, install: openInstallDialog }
 }
