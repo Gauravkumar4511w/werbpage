@@ -181,16 +181,16 @@ test('requests arriving together never hit a locked database', async () => {
   assert.equal((await request('/api/users/wallet', { body: player })).data.creditCoins, credited + 6)
 })
 
-test('10 coins is the smallest top-up and the smallest withdrawal', async () => {
+test('10 coins is the smallest top-up and 20 the smallest withdrawal', async () => {
   const topUp = await request('/api/payments/request', { body: { ...player, amount: 10, utr: '710000000010' } })
   assert.equal(topUp.status, 201, JSON.stringify(topUp.data))
 
   const before = (await request('/api/users/wallet', { body: player })).data.winningCoins
   const details = { upiId: 'p@upi', upiName: 'Wallet Player' }
-  const tooSmall = await request('/api/withdrawals/request', { body: { ...player, amount: 9, method: 'upi', details } })
+  const tooSmall = await request('/api/withdrawals/request', { body: { ...player, amount: 19, method: 'upi', details } })
   assert.equal(tooSmall.status, 400)
-  assert.match(tooSmall.data.message, /at least 10/)
-  const smallest = await request('/api/withdrawals/request', { body: { ...player, amount: 10, method: 'upi', details } })
+  assert.match(tooSmall.data.message, /at least 20/)
+  const smallest = await request('/api/withdrawals/request', { body: { ...player, amount: 20, method: 'upi', details } })
   assert.equal(smallest.status, 201, JSON.stringify(smallest.data))
-  assert.equal(smallest.data.wallet.winningCoins, before - 10)
+  assert.equal(smallest.data.wallet.winningCoins, before - 20)
 })
