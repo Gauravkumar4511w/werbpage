@@ -32,7 +32,7 @@ function fromCatalog(match) {
 const hour = 60 * 60 * 1000
 const scheduleIdPrefix = /^(\d{4}-\d{2}-\d{2}t\d{2}:\d{2}:\d{2}\.\d{3}z)-\d+-/
 
-// Daily matches run until 1:20 AM, so a match belongs to the day its id was scheduled on, not the
+// Daily matches used to run until 1:20 AM, so a match belongs to the day its id was scheduled on, not the
 // calendar day it starts. Admin-created matches use their start time.
 function getScheduleDay(match) {
   const prefix = match.id.match(scheduleIdPrefix)?.[1]
@@ -155,7 +155,7 @@ function TournamentSection({ tournamentsOpen, onBack, joinedMatches, onJoinMatch
     >
       <button className="library-back" type="button" onClick={onBack}>&lt;- Back to discover</button>
       <div className="tournament-heading">
-        <div><p className="eyebrow"><span></span> Free Fire MAX arena</p><h2 id="tournament-title">LIVE MATCHES.</h2><p>Two matches in every mode, every day from 8:00 AM to 1:20 AM.</p></div>
+        <div><p className="eyebrow"><span></span> Free Fire MAX arena</p><h2 id="tournament-title">LIVE MATCHES.</h2><p>A match every hour from 9:00 AM to 10:00 PM, two in a row for each mode.</p></div>
         <button className="tournament-badge" type="button" onClick={() => setLiveOpen((open) => !open)} aria-expanded={liveOpen}><span></span> LIVE SCHEDULE</button>
       </div>
       {liveOpen ? (

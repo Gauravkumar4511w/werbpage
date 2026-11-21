@@ -28,7 +28,7 @@ async function request(url, { method = 'POST', body, headers = {}, query } = {})
   return result
 }
 
-// 07:00 in India on 25 November 2026, before that day's first match at 08:00.
+// 07:00 in India on 25 November 2026, before that day's first match at 09:00.
 const offerDay = Date.UTC(2026, 10, 25, 1, 30)
 let admin
 const players = [1, 2].map((n) => ({ userKey: `+91 91111 0000${n}`, password: `free-${n}-secret` }))
