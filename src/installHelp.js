@@ -3,7 +3,8 @@
 //
 //   installed  - already running as the installed app
 //   ios-safari - iPhone/iPad Safari: Share, then Add to Home Screen
-//   ios-other  - iPhone/iPad in Chrome, an in-app browser...: open in Safari first
+//   ios-chrome - iPhone/iPad Chrome, Edge or Firefox: their Share button, then Add to Home Screen
+//   ios-other  - iPhone/iPad inside an app (WhatsApp, Instagram...): open in Safari first
 //   in-app     - inside WhatsApp, Instagram, Facebook...: open in Chrome first
 //   android    - Android Chrome or similar: the menu's Install app / Add to Home screen
 //   desktop    - a computer: the install icon in the address bar or the browser menu
@@ -13,8 +14,9 @@ export function getInstallPlatform({ userAgent = '', standalone = false, maxTouc
   const inApp = /(FBAN|FBAV|FB_IAB|Instagram|WhatsApp|Line\/|Snapchat|Twitter|LinkedInApp|GSA\/|; wv\))/i.test(ua)
   const ios = /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/i.test(ua) && maxTouchPoints > 1)
   if (ios) {
-    const safari = /Safari/i.test(ua) && !/(CriOS|FxiOS|EdgiOS|OPiOS)/i.test(ua) && !inApp
-    return safari ? 'ios-safari' : 'ios-other'
+    if (inApp) return 'ios-other'
+    if (/(CriOS|FxiOS|EdgiOS)/i.test(ua)) return 'ios-chrome'
+    return /Safari/i.test(ua) && !/OPiOS/i.test(ua) ? 'ios-safari' : 'ios-other'
   }
   if (inApp) return 'in-app'
   if (/Android/i.test(ua)) return 'android'
@@ -30,7 +32,12 @@ export function currentInstallPlatform() {
 export const INSTALL_STEPS = {
   'ios-safari': {
     title: 'Install on iPhone',
-    steps: ['Tap the Share button at the bottom of Safari (the square with an arrow).', 'Scroll and tap "Add to Home Screen".', 'Tap "Add". ArenaCore appears on your home screen.'],
+    steps: ['Tap the Share button at the bottom of Safari (the square with an arrow).', 'Scroll and tap "Add to Home Screen".', 'Tap "Add". ArenaCore appears on your home screen and opens full screen, like any app.'],
+  },
+  'ios-chrome': {
+    title: 'Install on iPhone',
+    steps: ['Tap the Share button at the top right, in the address bar.', 'Tap "Add to Home Screen" (iOS 16.4 or newer), then "Add".', 'No "Add to Home Screen"? Copy the link, open it in Safari, and use Safari\'s Share button.'],
+    copyLink: true,
   },
   'ios-other': {
     title: 'Open in Safari to install',

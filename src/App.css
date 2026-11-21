@@ -1439,3 +1439,15 @@ body { background: #07111c; }
 @keyframes sheet-up { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
 @media (min-width: 761px) { .install-help-backdrop { place-items: center; } }
 @media (prefers-reduced-motion: reduce) { .install-help-backdrop, .install-help { animation: none; } }
+
+/* Opened from the home screen (iPhone full screen, notch phones): keep the bar and the page clear of
+   the status bar and the notch. env() is 0 in a normal browser tab, so nothing moves there. */
+.navbar { padding-top: env(safe-area-inset-top); min-height: calc(82px + env(safe-area-inset-top)); }
+.gaming-page { padding-top: calc(82px + env(safe-area-inset-top)); }
+.login-gate { padding-top: 0; }
+@media (max-width: 760px) {
+  .navbar { min-height: calc(70px + env(safe-area-inset-top)); }
+  .gaming-page { padding-top: calc(70px + env(safe-area-inset-top)); }
+  .login-gate { padding-top: 0; }
+}
+.auth-backdrop.is-required { padding-top: calc(72px + env(safe-area-inset-top)); }
