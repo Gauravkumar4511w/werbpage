@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { DEFAULT_ENTRY_FEES, EDIT_LOCK_MS, MATCH_MODES, POOL_TOP_THREE_SHARES, getEntryCost, getTopThreePrizes, topThreeFollowsPool, formatMatchNo, getMatchCapacity, getPerKillCoins, getScheduledMatches, getWinningCoins } from '../../lib/match-schedule.js'
+import { DEFAULT_ENTRY_FEES, EDIT_LOCK_MS, MATCH_MODES, POOL_TOP_THREE_SHARES, ROOM_REVEAL_MS, getEntryCost, getTopThreePrizes, topThreeFollowsPool, formatMatchNo, getMatchCapacity, getPerKillCoins, getScheduledMatches, getWinningCoins } from '../../lib/match-schedule.js'
 import freeFireMaxIcon from '../assets/hero-banner.jpg'
 import battleRoyalImage from '../assets/battelroyal.jpg'
 import clashSquadImage from '../assets/clashsquad.jpg'
@@ -68,6 +68,44 @@ function ModeGlyph({ family }) {
     return <svg className="match-card-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3.5 8.5 8h7L20 3.5V13l-8 7.5L4 13V3.5Z" /><path d="M9.2 12.3h.01M14.8 12.3h.01" /></svg>
   }
   return <svg className="match-card-glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.5" /><path d="M12 2v5M12 17v5M2 12h5M17 12h5" /><circle cx="12" cy="12" r="1.4" /></svg>
+}
+
+// Copies text, falling back to a hidden text box where the clipboard API is missing or blocked
+// (some in-app browsers on phones).
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    const box = document.createElement('textarea')
+    box.value = text
+    box.setAttribute('readonly', '')
+    box.style.position = 'fixed'
+    box.style.opacity = '0'
+    document.body.appendChild(box)
+    box.select()
+    const copied = document.execCommand('copy')
+    box.remove()
+    return copied
+  }
+}
+
+// A room value with its own Copy button. Taps stay on the button, so the card does not open.
+function RoomValue({ label, value }) {
+  const [copied, setCopied] = useState(false)
+  const copy = async (event) => {
+    event.stopPropagation()
+    if (!(await copyText(value))) return
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 1500)
+  }
+  return (
+    <div className="match-card-room-value">
+      <span>{label}</span>
+      <strong>{value || 'No password'}</strong>
+      {value && <button type="button" onClick={copy}>{copied ? 'Copied' : 'Copy'}</button>}
+    </div>
+  )
 }
 
 function TeamPips({ size }) {
@@ -283,6 +321,20 @@ function TournamentSection({ tournamentsOpen, onBack, joinedMatches, onJoinMatch
                         <small>{matchCapacity.teamSize === 1 ? 'Solo' : `${matchCapacity.teamSize} players`}</small>
                       </div>
                     </dl>
+                    {/* Room details reach only players who joined: the server sends them with the player's
+                        own entries, from 10 minutes before the start, and never in the public list. */}
+                    {isJoined && !hasEnded && (joinedEntry.roomId ? (
+                      <div className="match-card-room" onClick={(event) => event.stopPropagation()}>
+                        <RoomValue label="Room ID" value={joinedEntry.roomId} />
+                        <RoomValue label="Password" value={joinedEntry.roomPassword} />
+                      </div>
+                    ) : (
+                      <p className="match-card-room-note">
+                        {currentTime >= match.matchTimestamp - ROOM_REVEAL_MS
+                          ? 'Room ID and password are on their way. They appear here as soon as the admin posts them.'
+                          : 'You joined. Room ID and password appear here 10 minutes before the start.'}
+                      </p>
+                    ))}
                     {topPrizes && (
                       <div className="match-card-top3">
                         <span className="match-card-top3-label">Top 3</span>
