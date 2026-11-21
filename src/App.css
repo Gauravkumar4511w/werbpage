@@ -1416,3 +1416,14 @@ body { background: #07111c; }
 .match-card-room-value button:hover { background: rgba(94,227,154,.14); }
 .match-card-room-note { margin: 0; padding: 9px 12px; border: 1px dashed rgba(94,227,154,.35); border-radius: 12px; color: #9fd9b8; font-size: 11px; line-height: 1.45; text-align: left; }
 @media (max-width: 360px) { .match-card-room { grid-template-columns: 1fr; } }
+
+/* Install button under the login box, shown only when Chrome can install the app. */
+.install-app-cta { display: flex; align-items: center; gap: 12px; width: min(100%, 420px); margin: 14px auto 0; padding: 12px 16px; border: 1px solid rgba(255,194,71,.45); border-radius: 14px; color: #fff; background: linear-gradient(135deg, rgba(255,194,71,.16), rgba(255,140,40,.1)); box-shadow: 0 12px 28px -14px rgba(255,176,46,.7); text-align: left; cursor: pointer; transition: transform .2s ease, background .2s ease; animation: gate-card-in .5s .15s cubic-bezier(.2,.9,.3,1.1) both; }
+.install-app-cta:hover { background: linear-gradient(135deg, rgba(255,194,71,.24), rgba(255,140,40,.16)); transform: translateY(-1px); }
+.install-app-cta:active { transform: scale(.98); }
+.install-app-cta svg { flex: none; width: 34px; height: 34px; padding: 7px; border-radius: 10px; fill: none; stroke: #1a1206; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; background: #ffc247; }
+.install-app-cta span { display: grid; gap: 2px; }
+.install-app-cta strong { font-size: 14px; letter-spacing: .02em; }
+.install-app-cta small { color: #c9b48a; font-size: 11px; }
+@media (max-width: 760px) { .auth-backdrop.is-required { align-content: start; } .install-app-cta { width: min(100%, 350px); margin-bottom: 18px; } }
+@media (prefers-reduced-motion: reduce) { .install-app-cta { animation: none; transition: none; } }

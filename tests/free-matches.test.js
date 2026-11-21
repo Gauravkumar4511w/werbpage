@@ -82,20 +82,54 @@ test('joining a free match takes no coins, while the same mode\'s paid match sti
   assert.equal((await catalogMatch(paid)).free_entry, 0)
 })
 
-test('a free match still pays the normal kill coins, and shows nothing collected', async () => {
+test('a free match pays no kill coins, only its top 3, and shows nothing collected', async () => {
   const solo = scheduled(offerDay, 'Battle Royale Solo', 0)
+  assert.equal(solo.perKill, 0)
   for (const [index, player] of players.entries()) {
     await db.recordMatchEntry({ ...player, matchId: solo.id, identifiers: [`Solo${index}x`] }, offerDay)
   }
+  assert.equal((await catalogMatch(solo)).per_kill, 0)
   const winningBefore = (await walletOf(players[1])).winningCoins
-  // 3 kills at the normal 4 coins a kill for a 10 coin Solo, paid by the house.
   const kills = await request('/api/admin/matches/kills', { headers: admin, body: { matchId: solo.id.toLowerCase(), kills: [{ userKey: players[1].userKey, kills: 3 }] } })
   assert.equal(kills.status, 200, JSON.stringify(kills.data))
-  assert.equal((await walletOf(players[1])).winningCoins, winningBefore + 12)
+  assert.equal((await walletOf(players[1])).winningCoins, winningBefore)
 
+  // The winner gets 1st place, 15 coins, paid by the house.
   const result = await request('/api/admin/matches/confirm-result', { headers: admin, body: { matchId: solo.id.toLowerCase(), winnerTeamKey: players[1].userKey } })
   assert.equal(result.status, 200, JSON.stringify(result.data))
   assert.equal(result.data.payout.totalPool, 0)
+  assert.equal((await walletOf(players[1])).winningCoins, winningBefore + 15)
+})
+
+test('free matches made before the rule get per kill 0, unless kill coins were paid or the admin set a rate', async () => {
+  const day = Date.UTC(2026, 10, 27, 1, 30) // 07:00 on 27 Nov in India
+  const [solo, duo, squad] = ['Battle Royale Solo', 'Battle Royale Duo', 'Battle Royale Squad'].map((mode) => scheduled(day, mode, 0))
+  await db.getPublicMatchCatalog(day)
+  const raw = createClient({ url: `file:${path.join(directory, 'arenacore.sqlite')}` })
+  // Stored the way free matches were made before: no rate, so the paid default applied.
+  await raw.execute({ sql: 'UPDATE matches SET per_kill = NULL WHERE match_id IN (?, ?, ?)', args: [solo.id.toLowerCase(), duo.id.toLowerCase(), squad.id.toLowerCase()] })
+  // Kill coins were already paid in the Duo match, and the admin set 3 a kill in the Squad match.
+  await raw.execute({ sql: "INSERT INTO match_kills (match_id, user_key, kills, paid) VALUES (?, 'early@test.com', 2, 12)", args: [duo.id.toLowerCase()] })
+  await raw.execute({ sql: 'UPDATE matches SET per_kill = 3 WHERE match_id = ?', args: [squad.id.toLowerCase()] })
+  raw.close()
+
+  const catalog = await db.getPublicMatchCatalog(day)
+  const rate = (match) => catalog.find((item) => item.match_id === match.id.toLowerCase()).per_kill
+  assert.equal(rate(solo), 0)
+  assert.equal(rate(duo), null)
+  assert.equal(rate(squad), 3)
+})
+
+test('a free match already played keeps the kill coins its players were shown', async () => {
+  const day = Date.UTC(2026, 10, 28, 1, 30) // 07:00 on 28 Nov in India
+  const solo = scheduled(day, 'Battle Royale Solo', 0)
+  await db.getPublicMatchCatalog(day)
+  const raw = createClient({ url: `file:${path.join(directory, 'arenacore.sqlite')}` })
+  await raw.execute({ sql: 'UPDATE matches SET per_kill = NULL WHERE match_id = ?', args: [solo.id.toLowerCase()] })
+  raw.close()
+  // Loaded after its 9:00 AM start: it stays on the default rate.
+  const afterStart = await db.getPublicMatchCatalog(solo.matchTimestamp + 30 * 60 * 1000)
+  assert.equal(afterStart.find((item) => item.match_id === solo.id.toLowerCase()).per_kill, null)
 })
 
 test('Clash Squad and Lone Wolf stay paid during the offer', async () => {
