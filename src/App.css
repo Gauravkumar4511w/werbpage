@@ -1454,3 +1454,15 @@ body { background: #07111c; }
 @keyframes bell-ring { 0%, 70%, 100% { transform: rotate(0); } 75% { transform: rotate(14deg); } 80% { transform: rotate(-12deg); } 85% { transform: rotate(8deg); } 90% { transform: rotate(-4deg); } }
 @media (max-width: 760px) { .notify-prompt { right: 12px; bottom: calc(92px + env(safe-area-inset-bottom)); width: calc(100% - 24px); } }
 @media (prefers-reduced-motion: reduce) { .notify-prompt, .notify-prompt-bell { animation: none; } }
+
+/* Opened from the home screen (iPhone full screen, notch phones): keep the bar and the page clear of
+   the status bar and the notch. env() is 0 in a normal browser tab, so nothing moves there. */
+.navbar { padding-top: env(safe-area-inset-top); min-height: calc(82px + env(safe-area-inset-top)); }
+.gaming-page { padding-top: calc(82px + env(safe-area-inset-top)); }
+.login-gate { padding-top: 0; }
+@media (max-width: 760px) {
+  .navbar { min-height: calc(70px + env(safe-area-inset-top)); }
+  .gaming-page { padding-top: calc(70px + env(safe-area-inset-top)); }
+  .login-gate { padding-top: 0; }
+}
+.auth-backdrop.is-required { padding-top: calc(72px + env(safe-area-inset-top)); }

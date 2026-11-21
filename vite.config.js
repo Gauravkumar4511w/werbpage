@@ -56,9 +56,20 @@ export default defineConfig({
         start_url: '/',
         scope: '/',
         display: 'standalone',
+        display_override: ['standalone'],
         orientation: 'any',
         background_color: '#070b10',
         theme_color: '#070b10',
+        categories: ['games', 'sports'],
+        // Installed on Android, links to the site open in the app, and tapping the icon again goes
+        // back to the open app instead of a second copy.
+        handle_links: 'preferred',
+        launch_handler: { client_mode: ['navigate-existing', 'auto'] },
+        // Long-press the app icon for these.
+        shortcuts: [
+          { name: 'Matches', short_name: 'Matches', url: '/#tournaments', icons: [{ src: '/pwa-192x192.png', sizes: '192x192', type: 'image/png' }] },
+          { name: 'My Matches', short_name: 'My Matches', url: '/#my-matches', icons: [{ src: '/pwa-192x192.png', sizes: '192x192', type: 'image/png' }] },
+        ],
         icons: [
           { src: '/pwa-192x192.png', sizes: '192x192', type: 'image/png' },
           { src: '/pwa-512x512.png', sizes: '512x512', type: 'image/png' },
