@@ -155,7 +155,7 @@ function TournamentSection({ tournamentsOpen, onBack, joinedMatches, onJoinMatch
     >
       <button className="library-back" type="button" onClick={onBack}>&lt;- Back to discover</button>
       <div className="tournament-heading">
-        <div><p className="eyebrow"><span></span> Free Fire MAX arena</p><h2 id="tournament-title">LIVE MATCHES.</h2><p>A match every hour from 9:00 AM to 10:00 PM, two in a row for each mode.</p></div>
+        <div><p className="eyebrow"><span></span> Free Fire MAX arena</p><h2 id="tournament-title">LIVE MATCHES.</h2><p>A match every hour from 9:00 AM to 1:00 AM: three in a row for each Battle Royale mode, two for the others.</p></div>
         <button className="tournament-badge" type="button" onClick={() => setLiveOpen((open) => !open)} aria-expanded={liveOpen}><span></span> LIVE SCHEDULE</button>
       </div>
       {liveOpen ? (
@@ -167,7 +167,7 @@ function TournamentSection({ tournamentsOpen, onBack, joinedMatches, onJoinMatch
       ) : <div className="tournament-days">
         {visibleSchedule.map((day) => (
           <div className={`tournament-date-group${expandedMode ? ' is-detail-view' : ''}`} key={day.key}>
-            <div className="date-heading"><h3>{day.date}</h3><span>2 matches / mode</span></div>
+            <div className="date-heading"><h3>{day.date}</h3><span>A match every hour</span></div>
             {expandedMode && <button className="matches-back" type="button" onClick={() => setExpandedMode(null)}>&lt;- Back to modes</button>}
             {matchGroups.filter((group) => !expandedMode || group.name === expandedMode).map((group) => (
               <section className={`tournament-day match-category${expandedMode === group.name ? ' is-expanded' : ''}`} key={`${day.date}-${group.name}`}>
