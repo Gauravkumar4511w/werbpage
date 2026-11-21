@@ -117,6 +117,8 @@ test('from 22 Nov there is a match every hour from 9 AM to 1 AM, three in a row 
   const switchDay = getScheduledMatches(Date.UTC(2026, 10, 21, 1, 0))
   assert.deepEqual(switchDay.filter((match) => match.mode === 'Battle Royale Solo').map((match) => indiaTime(match.matchTimestamp)), ['09:00', '10:00', '18:30', '20:30'])
   assert.equal(switchDay.length, 16)
+  // Like Duo and Squad that day, Solo had two free matches: 9:00 AM and 6:30 PM.
+  assert.deepEqual(switchDay.filter((match) => match.freeEntry).map((match) => `${indiaTime(match.matchTimestamp)} ${match.mode}`), ['09:00 Battle Royale Solo', '17:00 Battle Royale Duo', '18:30 Battle Royale Solo', '19:00 Battle Royale Squad'])
   // 20 Nov keeps the timetable its matches were made with.
   assert.equal(indiaTime(getScheduledMatches(Date.UTC(2026, 10, 20, 1, 0))[0].matchTimestamp), '08:00')
 })
