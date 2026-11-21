@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { DEFAULT_ENTRY_FEES, EDIT_LOCK_MS, MATCH_MODES, getEntryCost, formatMatchNo, getMatchCapacity, getPerKillCoins, getScheduledMatches, getWinningCoins } from '../../lib/match-schedule.js'
+import { DEFAULT_ENTRY_FEES, EDIT_LOCK_MS, MATCH_MODES, POOL_TOP_THREE_SHARES, getEntryCost, getTopThreePrizes, topThreeFollowsPool, formatMatchNo, getMatchCapacity, getPerKillCoins, getScheduledMatches, getWinningCoins } from '../../lib/match-schedule.js'
 import freeFireMaxIcon from '../assets/hero-banner.jpg'
 import battleRoyalImage from '../assets/battelroyal.jpg'
 import clashSquadImage from '../assets/clashsquad.jpg'
@@ -21,6 +21,7 @@ function fromCatalog(match) {
     description: match.description || '',
     entryFee: Number(match.entry_fee) || DEFAULT_ENTRY_FEES[match.mode],
     freeEntry: Number(match.free_entry) === 1,
+    topPrizes: [match.prize_1, match.prize_2, match.prize_3],
     matchTimestamp: Number(match.match_timestamp) || 0,
     prizePool: match.prize_pool,
     perKill: match.per_kill,
@@ -223,6 +224,10 @@ function TournamentSection({ tournamentsOpen, onBack, joinedMatches, onJoinMatch
                 const isLive = hasStarted && !hasEnded && currentTime < match.matchTimestamp + 3 * hour
                 const buttonLabel = isJoined ? (canEdit ? 'Edit' : 'Joined') : isLive ? 'Live' : hasEnded || hasStarted ? 'Played' : isFull ? 'Full' : 'Join'
                 const cost = getEntryCost({ entryFee, freeEntry: match.freeEntry })
+                // Battle Royale top 3: fixed coins (free match or set by the admin), or a share of the entries.
+                const topSource = { mode: match.mode, entryFee, freeEntry: match.freeEntry, joinedTeams: joinedCount, prizes: match.topPrizes || [] }
+                const topByPool = topThreeFollowsPool(topSource)
+                const topPrizes = String(match.mode).startsWith('Battle Royale') ? getTopThreePrizes(topSource) : null
                 const details = { ...match, entryFee, cost, joinedEntry, hasStarted, isFull }
                 const family = getModeFamily(match.mode)
                 const status = isJoined ? { tone: 'joined', label: 'Joined' }
@@ -278,6 +283,18 @@ function TournamentSection({ tournamentsOpen, onBack, joinedMatches, onJoinMatch
                         <small>{matchCapacity.teamSize === 1 ? 'Solo' : `${matchCapacity.teamSize} players`}</small>
                       </div>
                     </dl>
+                    {topPrizes && (
+                      <div className="match-card-top3">
+                        <span className="match-card-top3-label">Top 3</span>
+                        {['1st', '2nd', '3rd'].map((place, index) => (
+                          <span className={`match-card-medal is-${index + 1}`} key={place}>
+                            <i>{place}</i>
+                            <b>{topByPool ? `${Math.round(POOL_TOP_THREE_SHARES[index] * 100)}%` : topPrizes[index]}</b>
+                          </span>
+                        ))}
+                        <small>{topByPool ? 'of entries' : 'coins'}</small>
+                      </div>
+                    )}
                     {/* Never disabled for low coins: tapping Join then explains how many coins are missing. */}
                     <button
                       type="button"

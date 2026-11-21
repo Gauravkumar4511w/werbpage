@@ -11,7 +11,7 @@ import Navbar from "./components/Navbar";
 import TournamentSection from "./components/TournamentSection";
 import WalletModal from "./components/WalletModal";
 import { MIN_TOPUP_COINS, MIN_WITHDRAW_COINS } from "../lib/wallet-limits.js";
-import { EDIT_LOCK_MS, formatMatchNo, getEntryCost, getPerKillCoins, getTeamSize, getWinningCoins } from "../lib/match-schedule.js";
+import { EDIT_LOCK_MS, POOL_TOP_THREE_SHARES, formatMatchNo, getEntryCost, getPerKillCoins, getTeamSize, getTopThreePrizes, getWinningCoins, topThreeFollowsPool } from "../lib/match-schedule.js";
 import { imageFileToDataUrl } from "./imageUpload.js";
 
 const userDataStorageKey = "nexus-user-data";
@@ -945,6 +945,13 @@ function App() {
   const detailsStarted = Boolean(matchDetails?.matchTimestamp) && currentTime >= matchDetails.matchTimestamp;
   const detailsWinning = matchDetails ? getWinningCoins(matchDetails) : null;
   const detailsPerKill = matchDetails ? getPerKillCoins(matchDetails) : 0;
+  // Battle Royale top 3 prizes: fixed coins, or a share of the entries while they follow the pool.
+  const detailsTopSource = matchDetails ? { ...matchDetails, joinedTeams: matchDetails.joinedCount || 0, prizes: matchDetails.topPrizes || [] } : null;
+  const detailsTopThree = matchDetails && String(matchDetails.mode).startsWith("Battle Royale")
+    ? (topThreeFollowsPool(detailsTopSource)
+      ? POOL_TOP_THREE_SHARES.map((share) => `${Math.round(share * 100)}%`).join(" / ") + " of entries"
+      : getTopThreePrizes(detailsTopSource).join(" / ") + " coins")
+    : "";
 
   return (
     <main className="gaming-page">
@@ -1112,6 +1119,12 @@ function App() {
                   <div className="match-detail-win">
                     <span>Per kill</span>
                     <strong>{detailsPerKill} {detailsPerKill === 1 ? "coin" : "coins"}</strong>
+                  </div>
+                )}
+                {detailsTopThree && (
+                  <div className="match-detail-win">
+                    <span>Top 3 (1st / 2nd / 3rd)</span>
+                    <strong>{detailsTopThree}</strong>
                   </div>
                 )}
                 <div>

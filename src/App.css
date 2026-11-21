@@ -1394,3 +1394,15 @@ body { background: #07111c; }
 /* Free launch-offer matches: a green tag on the card and FREE on the join button. */
 .match-card-tag.is-free { color: #7ff0b0; background: rgba(94,227,154,.14); box-shadow: inset 0 0 0 1px rgba(94,227,154,.45); }
 .match-card-free { padding: 3px 8px; border-radius: 999px; color: #0b2a18; background: #7ff0b0; font-family: var(--mono); font-size: 12px; font-weight: 800; letter-spacing: .08em; text-shadow: none; }
+
+/* Battle Royale top 3 prizes on a match card: gold, silver and bronze. */
+.match-card-top3 { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: -4px; }
+.match-card-top3-label { margin-right: 2px; color: #8792a0; font-size: 9px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.match-card-medal { display: inline-flex; align-items: baseline; gap: 5px; padding: 4px 9px; border-radius: 999px; background: rgba(255,255,255,.05); box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
+.match-card-medal i { font-size: 9px; font-style: normal; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.match-card-medal b { color: #f3f6f9; font-family: var(--mono); font-size: 12px; }
+.match-card-medal.is-1 i { color: #ffd166; }
+.match-card-medal.is-1 { box-shadow: inset 0 0 0 1px rgba(255,209,102,.45); background: rgba(255,209,102,.08); }
+.match-card-medal.is-2 i { color: #cfd8e3; }
+.match-card-medal.is-3 i { color: #e0a070; }
+.match-card-top3 small { color: #75808d; font-size: 10px; }
