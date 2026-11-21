@@ -7,6 +7,7 @@ import HeroSection from "./components/HeroSection";
 import LibrarySection from "./components/LibrarySection";
 import MyMatchesSection from "./components/MyMatchesSection";
 import InstallAppButton from "./components/InstallAppButton";
+import NotifyPrompt from "./components/NotifyPrompt";
 import { countUpcomingMatches } from "./myMatches.js";
 import Navbar from "./components/Navbar";
 import TournamentSection from "./components/TournamentSection";
@@ -171,6 +172,8 @@ function App() {
   const [walletSyncTick, setWalletSyncTick] = useState(0);
   const [notice, setNotice] = useState(null);
   const paymentStatuses = useRef(null);
+  // The last wallet seen, to tell the player the moment coins arrive or a room is posted.
+  const walletSnapshot = useRef(null);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
   const [player, setPlayer] = useState(() => {
     const savedPlayer = localStorage.getItem("nexus-player");
@@ -316,11 +319,13 @@ function App() {
     userDataReady.current = true;
   };
   const onWalletLoaded = useEffectEvent(applyWallet);
+  const onLiveAlert = useEffectEvent((text) => showNotice(text));
 
   // The server wallet is the source of truth: admin approvals, adjustments, and winnings all land there.
   useEffect(() => {
     if (!player) {
       paymentStatuses.current = null;
+      walletSnapshot.current = null;
       return undefined;
     }
     let active = true;
@@ -329,6 +334,21 @@ function App() {
         const wallet = await postJson("/api/users/wallet", { userKey: getUserKey(player), password: player.password });
         if (!active) return;
         onWalletLoaded(wallet);
+
+        // Real-time alerts while the app is open: coins that arrived and rooms just posted.
+        const rooms = Object.fromEntries((wallet.entries || []).map((entry) => [String(entry.matchId).toLowerCase(), entry]));
+        const seen = walletSnapshot.current;
+        walletSnapshot.current = { coins: Number(wallet.totalCoins) || 0, rooms: Object.fromEntries(Object.entries(rooms).map(([id, entry]) => [id, entry.roomId || ""])) };
+        if (seen) {
+          const ready = Object.entries(rooms).find(([id, entry]) => entry.roomId && !seen.rooms[id]);
+          const added = walletSnapshot.current.coins - seen.coins;
+          if (ready) {
+            const entry = ready[1];
+            onLiveAlert(`Room ready for ${formatMatchNo(entry.dayNo) || "your match"} ${entry.mode || ""}: Room ID and password are on its card and in My Matches.`.replace(/\s+:/, ":"));
+          } else if (added > 0) {
+            onLiveAlert(`+${added.toLocaleString()} ${added === 1 ? "coin" : "coins"} added to your wallet.`);
+          }
+        }
 
         const previous = paymentStatuses.current;
         paymentStatuses.current = Object.fromEntries((wallet.payments || []).map((payment) => [payment.id, payment.status]));
@@ -1001,6 +1021,7 @@ function App() {
         coinBalance={visibleCoins}
         playerLevel={profileStats.level}
       />
+      {!adminOpen && <NotifyPrompt player={player} userKey={getUserKey(player)} />}
       {adminOpen ? (
         <AdminPanel onBack={() => { setAdminOpen(false); window.history.pushState({ view: "home" }, "", "#discover"); }} />
       ) : tournamentsOpen ? (
