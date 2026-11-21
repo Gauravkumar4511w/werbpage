@@ -101,22 +101,33 @@ test('the next day starts again from #01', async () => {
   assert.deepEqual(scheduled.map((match) => match.day_no), [1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15])
 })
 
-test('from 22 Nov there is a match every hour from 9 AM to 1 AM, three in a row for each Battle Royale mode', () => {
+test('from 22 Nov two modes share each block, on the hour and the half hour, each mode an hour apart', () => {
   const indiaTime = (timestamp) => new Date(timestamp + 330 * 60 * 1000).toISOString().slice(11, 16)
   const day = getScheduledMatches(Date.UTC(2026, 10, 21, 20, 0)) // 01:30 on 22 November in India
-  assert.deepEqual(day.map((match) => indiaTime(match.matchTimestamp)), ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00', '23:00', '00:00', '01:00'])
+  assert.deepEqual(day.map((match) => `${indiaTime(match.matchTimestamp)} ${match.mode}`), [
+    '09:00 Battle Royale Solo', '09:30 Clash Squad 1v1', '10:00 Battle Royale Solo', '10:30 Clash Squad 1v1', '11:00 Battle Royale Solo',
+    '15:00 Lone Wolf 1v1', '15:30 Clash Squad 2v2', '16:00 Lone Wolf 1v1', '16:30 Clash Squad 2v2',
+    '18:00 Battle Royale Duo', '18:30 Battle Royale Squad', '19:00 Battle Royale Duo', '19:30 Battle Royale Squad', '20:00 Battle Royale Duo', '20:30 Battle Royale Squad',
+    '21:00 Clash Squad 4v4', '22:00 Clash Squad 4v4',
+  ])
+  // No two matches start together.
+  assert.equal(new Set(day.map((match) => match.matchTimestamp)).size, day.length)
   for (const mode of new Set(day.map((match) => match.mode))) {
     const matches = day.filter((match) => match.mode === mode)
     assert.equal(matches.length, mode.startsWith('Battle Royale') ? 3 : 2, mode)
-    // Back to back, an hour apart.
+    // A mode's matches are an hour apart.
     matches.slice(1).forEach((match, index) => assert.equal(match.matchTimestamp - matches[index].matchTimestamp, hour, mode))
   }
-  assert.deepEqual(day.filter((match) => match.freeEntry).map((match) => `${indiaTime(match.matchTimestamp)} ${match.mode}`), ['09:00 Battle Royale Solo', '18:00 Battle Royale Duo', '21:00 Battle Royale Squad'])
+  assert.deepEqual(day.filter((match) => match.freeEntry).map((match) => `${indiaTime(match.matchTimestamp)} ${match.mode}`), ['09:00 Battle Royale Solo', '18:00 Battle Royale Duo', '18:30 Battle Royale Squad'])
 
-  // 21 Nov had two of each from 9 AM to 10 PM, plus two evening Solo matches after the midday switch.
+  // 21 Nov had two of each from 9 AM to 10 PM; after the midday switch, Solo got 6:30 and 8:30 PM,
+  // Lone Wolf 3:30 PM and Clash Squad 1v1 4:30 PM.
   const switchDay = getScheduledMatches(Date.UTC(2026, 10, 21, 1, 0))
-  assert.deepEqual(switchDay.filter((match) => match.mode === 'Battle Royale Solo').map((match) => indiaTime(match.matchTimestamp)), ['09:00', '10:00', '18:30', '20:30'])
-  assert.equal(switchDay.length, 16)
+  const timesOf = (mode) => switchDay.filter((match) => match.mode === mode).map((match) => indiaTime(match.matchTimestamp))
+  assert.deepEqual(timesOf('Battle Royale Solo'), ['09:00', '10:00', '18:30', '20:30'])
+  assert.deepEqual(timesOf('Lone Wolf 1v1'), ['13:00', '14:00', '15:30'])
+  assert.deepEqual(timesOf('Clash Squad 1v1'), ['11:00', '12:00', '16:30'])
+  assert.equal(switchDay.length, 18)
   // Like Duo and Squad that day, Solo had two free matches: 9:00 AM and 6:30 PM.
   assert.deepEqual(switchDay.filter((match) => match.freeEntry).map((match) => `${indiaTime(match.matchTimestamp)} ${match.mode}`), ['09:00 Battle Royale Solo', '17:00 Battle Royale Duo', '18:30 Battle Royale Solo', '19:00 Battle Royale Squad'])
   // 20 Nov keeps the timetable its matches were made with.

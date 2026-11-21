@@ -52,7 +52,10 @@ test('switching today keeps started and joined matches and adds the new times st
     '13:00 Lone Wolf 1v1',
     '14:00 Lone Wolf 1v1',
     '15:00 Clash Squad 2v2',
+    // Added that afternoon so Lone Wolf and Clash Squad 1v1 also had two matches.
+    '15:30 Lone Wolf 1v1',
     '16:00 Clash Squad 2v2',
+    '16:30 Clash Squad 1v1',
     '17:00 Battle Royale Duo FREE',
     // Joined before the switch: kept at its time.
     '17:20 Battle Royale Solo',
