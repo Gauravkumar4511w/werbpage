@@ -1407,6 +1407,16 @@ body { background: #07111c; }
 .match-card-medal.is-3 i { color: #e0a070; }
 .match-card-top3 small { color: #75808d; font-size: 10px; }
 
+/* Room details on a joined match card: only the player who joined ever receives them. */
+.match-card-room { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 10px; border-radius: 14px; background: rgba(94,227,154,.08); box-shadow: inset 0 0 0 1px rgba(94,227,154,.35); cursor: default; }
+.match-card-room-value { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 2px 8px; min-width: 0; }
+.match-card-room-value span { grid-column: 1 / -1; color: #7ff0b0; font-size: 9px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.match-card-room-value strong { overflow: hidden; color: #f3f6f9; font-family: var(--mono); font-size: 15px; text-overflow: ellipsis; white-space: nowrap; }
+.match-card-room-value button { padding: 5px 9px; border: 1px solid rgba(94,227,154,.5); border-radius: 8px; color: #7ff0b0; background: transparent; font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
+.match-card-room-value button:hover { background: rgba(94,227,154,.14); }
+.match-card-room-note { margin: 0; padding: 9px 12px; border: 1px dashed rgba(94,227,154,.35); border-radius: 12px; color: #9fd9b8; font-size: 11px; line-height: 1.45; text-align: left; }
+@media (max-width: 360px) { .match-card-room { grid-template-columns: 1fr; } }
+
 /* Install button under the login box, shown only when Chrome can install the app. */
 .install-app-cta { display: flex; align-items: center; gap: 12px; width: min(100%, 420px); margin: 14px auto 0; padding: 12px 16px; border: 1px solid rgba(255,194,71,.45); border-radius: 14px; color: #fff; background: linear-gradient(135deg, rgba(255,194,71,.16), rgba(255,140,40,.1)); box-shadow: 0 12px 28px -14px rgba(255,176,46,.7); text-align: left; cursor: pointer; transition: transform .2s ease, background .2s ease; animation: gate-card-in .5s .15s cubic-bezier(.2,.9,.3,1.1) both; }
 .install-app-cta:hover { background: linear-gradient(135deg, rgba(255,194,71,.24), rgba(255,140,40,.16)); transform: translateY(-1px); }
