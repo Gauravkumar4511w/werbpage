@@ -101,7 +101,7 @@ test('the next day starts again from #01', async () => {
   assert.deepEqual(scheduled.map((match) => match.day_no), [1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15])
 })
 
-test('from 22 Nov there is a match every hour from 9 AM to 10 PM, each mode\'s two an hour apart', () => {
+test('from 21 Nov there is a match every hour from 9 AM to 10 PM, each mode\'s two an hour apart', () => {
   const indiaTime = (timestamp) => new Date(timestamp + 330 * 60 * 1000).toISOString().slice(11, 16)
   const day = getScheduledMatches(Date.UTC(2026, 10, 21, 20, 0)) // 01:30 on 22 November in India
   assert.deepEqual(day.map((match) => indiaTime(match.matchTimestamp)), ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00'])
@@ -111,5 +111,6 @@ test('from 22 Nov there is a match every hour from 9 AM to 10 PM, each mode\'s t
   }
   assert.deepEqual(day.filter((match) => match.freeEntry).map((match) => `${indiaTime(match.matchTimestamp)} ${match.mode}`), ['09:00 Battle Royale Solo', '17:00 Battle Royale Duo', '19:00 Battle Royale Squad'])
   // The day before keeps the schedule its matches were made with.
-  assert.equal(indiaTime(getScheduledMatches(Date.UTC(2026, 10, 21, 1, 0))[0].matchTimestamp), '08:00')
+  assert.equal(indiaTime(getScheduledMatches(Date.UTC(2026, 10, 20, 1, 0))[0].matchTimestamp), '08:00')
+  assert.equal(indiaTime(getScheduledMatches(Date.UTC(2026, 10, 21, 1, 0))[0].matchTimestamp), '09:00')
 })
