@@ -165,9 +165,10 @@ test('the default prize pool counts the teams that actually joined', async () =>
   assert.equal(result.data.payout.payoutPool, 160)
 })
 
-test('a Battle Royale winner gets no winning coins unless the admin set them, since it pays per kill', async () => {
+test('a Battle Royale winner gets the 1st place share of the entries, plus any winning coins the admin set', async () => {
   const create = (body) => request('/api/admin/matches/create', { headers: admin, body: { mode: 'Battle Royale Solo', entryFee: 100, matchTimestamp: Date.now() + 2 * hour, ...body } })
-  for (const [prizePool, expected] of [[undefined, 0], [150, 150]]) {
+  // 3 players x 100 coins = 300 collected; 1st place gets 20% of it.
+  for (const [prizePool, expected] of [[undefined, 60], [150, 210]]) {
     const match = (await create({ prizePool })).data.match
     for (const [index, player] of players.entries()) {
       await request('/api/matches/entry', { body: { ...player, matchId: match.match_id, identifiers: [`Solo${index}`] } })
